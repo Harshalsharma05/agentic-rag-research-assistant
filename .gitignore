@@ -1,0 +1,66 @@
+# ============================================
+# Agentic RAG Project - Root .gitignore
+# ============================================
+
+# ========== Python (Backend) ==========
+# Virtual environments
+venv/
+env/
+ai-research/
+*.venv
+ENV/
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# ========== Backend Specific ==========
+# Environment variables (contains API keys!)
+.env
+.env.local
+
+# Vector database and downloads
+backend/chroma_db/
+backend/downloads/
+
+# ========== Node.js (Frontend) ==========
+# Dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# Next.js build outputs
+.next/
+out/
+build/
+
+# Production builds
+dist/
+
+# ========== IDE & Editors ==========
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ========== Logs ==========
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ========== OS Files ==========
+Thumbs.db
+Desktop.ini
+
+# ========== Misc ==========
+*.pem
+.vercel
+coverage/
+*.tsbuildinfo
