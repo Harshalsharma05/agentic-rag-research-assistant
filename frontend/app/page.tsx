@@ -49,7 +49,9 @@ export default function Home() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Generate a random session ID on load
-  const [sessionId, setSessionId] = useState(() => Math.random().toString(36).substring(2, 15));
+  const [sessionId, setSessionId] = useState(() =>
+    Math.random().toString(36).substring(2, 15),
+  );
 
   // Auto-scroll to the bottom when new messages arrive
   useEffect(() => {
@@ -101,7 +103,7 @@ export default function Home() {
 
     try {
       // Send request (now including chat_history!)
-      const res = await fetch("http://127.0.0.1:8000/api/chat", {
+      const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
