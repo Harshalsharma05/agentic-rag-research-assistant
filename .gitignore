@@ -11,6 +11,7 @@ ai-research/
 ENV/
 
 RENDER_DEPLOYMENT.md
+VERCEL_DEPLOYMENT.md
 
 # Python cache and compiled files
 __pycache__/
