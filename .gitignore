@@ -10,6 +10,8 @@ ai-research/
 *.venv
 ENV/
 
+RENDER_DEPLOYMENT.md
+
 # Python cache and compiled files
 __pycache__/
 *.py[cod]
