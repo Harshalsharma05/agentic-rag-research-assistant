@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import traceback
 import os
 
 app = FastAPI(title="AI Research Copilot API")
@@ -53,13 +54,22 @@ def chat_with_llm(request: QueryRequest):
 
         redis_url = os.environ.get("REDIS_URL")
         redis_history = RedisChatMessageHistory(
-            request.session_id,
+            session_id=request.session_id,
             url=redis_url or "redis://localhost:6379"
         )
 
         for msg in redis_history.messages:
-            role = "user" if msg.type == "human" else "assistant"
-            formatted_history.append({"role": role, "content": msg.content})
+            if msg.type == "human":
+                role = "user"
+            elif msg.type == "ai":
+                role = "assistant"
+            else:
+                continue
+
+            formatted_history.append({
+                "role": role,
+                "content": msg.content
+            })
 
         print(f"[REDIS MEMORY] Loaded {len(formatted_history)} previous messages.")
     except Exception as e:
@@ -77,12 +87,16 @@ def chat_with_llm(request: QueryRequest):
             "response": ""
         }
 
+        print("[STATE SENT TO AGENT]", initial_state)
         result = agent.invoke(initial_state)
     except Exception as e:
-        print(f"[AGENT ERROR] {str(e)}")
+        print("\n===== AGENT FULL ERROR =====")
+        traceback.print_exc()
+        print("============================\n")
+
         raise HTTPException(
             status_code=500,
-            detail=f"Agent processing failed: {str(e)}"
+            detail="Agent processing failed. Check backend logs."
         )
 
     if redis_history is not None:
@@ -93,8 +107,8 @@ def chat_with_llm(request: QueryRequest):
             print(f"[REDIS SAVE WARNING] {str(e)}")
 
     return {
-        "response": result["response"],
-        "sources": result["sources"]
+        "response": result.get("response", ""),
+        "sources": result.get("sources", [])
     }
 
 if __name__ == "__main__":

@@ -1,81 +1,150 @@
 import os
 import arxiv
-import fitz  # This is PyMuPDF
-from langchain_community.vectorstores import Chroma
-from langchain_huggingface import HuggingFaceEndpointEmbeddings
+import requests
+
+import chromadb
+from chromadb.config import Settings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-# Setup DB path (Same as in main.py)
+# --------------------------------
+# Vector DB path
+# --------------------------------
+
 persist_directory = "./chroma_db"
 
-print("Initializing embedding API...")
-embeddings = HuggingFaceEndpointEmbeddings(
-        model="sentence-transformers/all-MiniLM-L6-v2",
-        huggingfacehub_api_token=os.environ["HUGGINGFACEHUB_API_TOKEN"]
+# --------------------------------
+# Jina Embedding API
+# --------------------------------
+
+JINA_API_KEY = os.getenv("JINA_API_KEY")
+
+
+def get_embedding(text: str):
+
+    response = requests.post(
+        "https://api.jina.ai/v1/embeddings",
+        headers={
+            "Authorization": f"Bearer {JINA_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": "jina-embeddings-v2-base-en",
+            "input": text
+        },
     )
 
+    return response.json()["data"][0]["embedding"]
+
+
+class JinaEmbeddingFunction:
+
+    def embed_documents(self, texts):
+        return [get_embedding(text) for text in texts]
+
+    def embed_query(self, text):
+        return get_embedding(text)
+
+
+embeddings = JinaEmbeddingFunction()
+
+# --------------------------------
+# Ingestion Pipeline
+# --------------------------------
+
 def ingest_arxiv_papers(search_query: str, max_results: int = 1):
-    print(f"Step 1 & 2: Searching ArXiv for '{search_query}' and retrieving metadata...")
+
+    try:
+        import fitz
+    except Exception as e:
+        raise RuntimeError(
+            "PyMuPDF import failed during paper ingestion. "
+            "Install a compatible pymupdf build for this Python environment."
+        ) from e
+
+    print(f"Step 1 & 2: Searching ArXiv for '{search_query}'")
+
     client = arxiv.Client()
+
     search = arxiv.Search(
         query=search_query,
         max_results=max_results,
         sort_by=arxiv.SortCriterion.Relevance
     )
-    
+
     results = list(client.results(search))
+
     if not results:
         print("No papers found.")
         return
 
-    # Setup Embedding Model and Text Splitter
-    print("Loading embedding API...")
-    
-    # PDF Step 6 Setup: Split into chunks of 1000 characters with 100 char overlap
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-    
-    # Load our existing Vector DB
-    vector_db = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=100
+    )
 
-    # Create a folder to store downloaded PDFs
+    chroma_client = chromadb.PersistentClient(
+        path=persist_directory,
+        settings=Settings(anonymized_telemetry=False)
+    )
+    vector_db = chroma_client.get_or_create_collection("langchain")
+
     if not os.path.exists("downloads"):
         os.makedirs("downloads")
 
     for paper in results:
+
         print(f"\n--- Processing: {paper.title} ---")
-        
-        # Step 3: Download Research Papers
+
         pdf_path = f"downloads/{paper.get_short_id()}.pdf"
-        print(f"Step 3: Downloading PDF to {pdf_path}...")
+
+        print("Downloading PDF...")
         paper.download_pdf(filename=pdf_path)
 
-        # Step 4: Extract Text from PDFs
-        print("Step 4: Extracting text using PyMuPDF...")
+        print("Extracting text using PyMuPDF...")
+
         doc = fitz.open(pdf_path)
+
         full_text = ""
+
         for page in doc:
-            full_text += page.get_text() + "\n"
+            full_text += page.get_text()
+
         doc.close()
-        
-        # Step 5: Clean and Preprocess Text
-        print("Step 5: Cleaning text...")
-        full_text = full_text.replace('\n', ' ').strip()
 
-        # Step 6: Split Text into Chunks
-        print("Step 6: Splitting text into chunks...")
+        print("Cleaning text...")
+
+        full_text = full_text.replace("\n", " ").strip()
+
+        print("Splitting text into chunks...")
+
         chunks = text_splitter.split_text(full_text)
-        print(f"Created {len(chunks)} chunks.")
 
-        # Prepare metadata (Citations)
-        metadatas =[{"source": f"{paper.title} ({paper.published.year})"} for _ in chunks]
+        print(f"Created {len(chunks)} chunks")
 
-        # Step 7 & 8: Generate Embeddings & Store in Vector Database
-        print("Step 7 & 8: Generating embeddings and storing in ChromaDB...")
-        vector_db.add_texts(texts=chunks, metadatas=metadatas)
-        
-    # Step 9: Knowledge Base Creation
-    print("\nStep 9: Knowledge Base Creation Complete! Data is now searchable.")
+        metadatas = [
+            {"source": f"{paper.title} ({paper.published.year})"}
+            for _ in chunks
+        ]
+
+        print("Generating embeddings and storing in ChromaDB...")
+
+        vector_db.add(
+            documents=chunks,
+            metadatas=metadatas,
+            ids=[f"{paper.get_short_id()}-{index}" for index in range(len(chunks))],
+            embeddings=embeddings.embed_documents(chunks),
+        )
+
+    print("\nKnowledge base updated successfully")
+
+
+# --------------------------------
+# Test ingestion
+# --------------------------------
 
 if __name__ == "__main__":
-    # We will search for 1 real paper about "Multimodal AI" to test the pipeline
-    ingest_arxiv_papers("multimodal large language models", max_results=1)
+
+    ingest_arxiv_papers(
+        "multimodal large language models",
+        max_results=1
+    )
