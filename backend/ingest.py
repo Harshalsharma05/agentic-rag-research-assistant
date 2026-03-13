@@ -2,11 +2,17 @@ import os
 import arxiv
 import fitz  # This is PyMuPDF
 from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # Setup DB path (Same as in main.py)
 persist_directory = "./chroma_db"
+
+print("Initializing embedding API...")
+embeddings = HuggingFaceEndpointEmbeddings(
+        model="sentence-transformers/all-MiniLM-L6-v2",
+        huggingfacehub_api_token=os.environ["HUGGINGFACEHUB_API_TOKEN"]
+    )
 
 def ingest_arxiv_papers(search_query: str, max_results: int = 1):
     print(f"Step 1 & 2: Searching ArXiv for '{search_query}' and retrieving metadata...")
@@ -23,8 +29,7 @@ def ingest_arxiv_papers(search_query: str, max_results: int = 1):
         return
 
     # Setup Embedding Model and Text Splitter
-    print("Loading embedding model...")
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    print("Loading embedding API...")
     
     # PDF Step 6 Setup: Split into chunks of 1000 characters with 100 char overlap
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
