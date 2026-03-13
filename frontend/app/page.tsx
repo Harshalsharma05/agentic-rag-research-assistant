@@ -103,7 +103,9 @@ export default function Home() {
 
     try {
       // Send request (now including chat_history!)
-      const res = await fetch("/api/chat", {
+      // const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
+
+      const res = await fetch(`https://agentic-rag-backend-jy8a.onrender.com/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
