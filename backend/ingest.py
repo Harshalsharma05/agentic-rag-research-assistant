@@ -44,8 +44,32 @@ def get_embedding(text: str):
     return response.json()["data"][0]["embedding"]
 
 
-def embed_chunks(chunks):
-    return [get_embedding(chunk) for chunk in chunks]
+def embed_chunks(chunks, batch_size=32):
+
+    all_embeddings = []
+
+    for i in range(0, len(chunks), batch_size):
+
+        batch = chunks[i:i + batch_size]
+
+        response = requests.post(
+            "https://api.jina.ai/v1/embeddings",
+            headers={
+                "Authorization": f"Bearer {JINA_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "jina-embeddings-v2-base-en",
+                "input": batch
+            },
+            timeout=30
+        )
+
+        data = response.json()["data"]
+
+        all_embeddings.extend([item["embedding"] for item in data])
+
+    return all_embeddings
 
 
 # --------------------------------
