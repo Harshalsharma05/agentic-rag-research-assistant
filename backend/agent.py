@@ -7,6 +7,7 @@ from langgraph.graph import StateGraph, END
 from langchain_groq import ChatGroq 
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from ingest import ingest_arxiv_papers
 
 # Load environment variables (API Key)
@@ -19,7 +20,12 @@ llm = ChatGroq(
     groq_api_key=os.environ.get("GROQ_API_KEY")
 )
 
-embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+
+embeddings = HuggingFaceEndpointEmbeddings(
+    model="sentence-transformers/all-MiniLM-L6-v2",
+    huggingfacehub_api_token=os.environ["HUGGINGFACEHUB_API_TOKEN"]
+)
+
 persist_directory = "./chroma_db"
 vector_db = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
 

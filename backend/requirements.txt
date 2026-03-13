@@ -4,9 +4,9 @@ langgraph
 langchain
 langchain-community
 langchain-groq
+langchain-huggingface
 arxiv
 pymupdf
-sentence-transformers
 chromadb
 python-dotenv
 redis
