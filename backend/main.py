@@ -6,9 +6,14 @@ import os
 
 app = FastAPI(title="AI Research Copilot API")
 
+origins = [
+    "https://agentic-rag-research-assistant.vercel.app",
+    "http://localhost:3000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Allowing all origins for ease of local development
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
