@@ -1,225 +1,308 @@
-# 🤖 AI Research Copilot - Agentic RAG System
-
-> **An autonomous AI research assistant** that intelligently retrieves information from a vector database or dynamically fetches and processes ArXiv papers on-demand using LangGraph decision workflows.
+# 🤖 AI Research Copilot — Agentic RAG Research Assistant
 
 [![Live Demo](https://img.shields.io/badge/Demo-Live-success?style=for-the-badge)](https://agentic-rag-research-assistant-lb5yixibp.vercel.app/)
 [![Backend API](https://img.shields.io/badge/API-Deployed-blue?style=for-the-badge)](https://agentic-rag-backend-jy8a.onrender.com/)
 
----
+> An autonomous AI research assistant that dynamically retrieves knowledge from a vector database or performs real-time research by downloading and processing ArXiv papers.
 
-## 🎯 Project Overview
-
-AI Research Copilot is a production-grade **Retrieval-Augmented Generation (RAG)** system enhanced with **agentic workflows** powered by LangGraph. Unlike traditional RAG systems, this agent autonomously decides whether to answer from existing knowledge or trigger real-time research paper ingestion from ArXiv.
-
-### 🔑 Key Features
-
-✅ **Autonomous Agent Architecture** - LangGraph-based decision engine  
-✅ **Dynamic Knowledge Expansion** - Auto-downloads & processes research papers  
-✅ **Conversational Memory** - Multi-turn dialogue with context retention (3 follow-ups)  
-✅ **Real-time Inference** - Sub-second responses via Groq Llama 3.1  
-✅ **Source Attribution** - Automatic citation generation  
-✅ **Production Deployment** - Backend on Render, Frontend on Vercel
+Built using **LangGraph agent workflows**, **Supabase pgvector**, **Groq Llama-3.1**, and **Jina embeddings**.
 
 ---
 
-## 🏗️ System Architecture
+# 🎯 Project Overview
+
+AI Research Copilot is a **production-grade Agentic Retrieval-Augmented Generation (RAG) system**.
+
+Unlike traditional RAG pipelines that only query a static vector database, this system **autonomously decides when it needs to expand its knowledge** by downloading new research papers from ArXiv and adding them to its knowledge base.
+
+This allows the assistant to **continuously grow its research knowledge during conversations.**
+
+---
+
+# 🔑 Core Features
+
+✅ **Agentic AI Workflow** powered by LangGraph  
+✅ **Dynamic Knowledge Expansion** through ArXiv ingestion  
+✅ **Persistent Vector Database** using Supabase pgvector  
+✅ **Fast LLM Inference** with Groq Llama-3.1  
+✅ **Batch Embedding Pipeline** using Jina AI  
+✅ **Conversational Memory** using Redis  
+✅ **Real-time Research Retrieval**  
+✅ **Production Deployment** on Render + Vercel
+
+---
+
+# 🏗 System Architecture
 
 ![System Architecture](system_architecture.png)
 
-### Workflow Pipeline
+---
 
-1. **User Query** → Next.js Frontend
-2. **API Gateway** → FastAPI Backend
-3. **Agent Controller** (LangGraph) evaluates:
-   - **Path A**: Retrieve from ChromaDB if knowledge exists
-   - **Path B**: Trigger ArXiv search → Download PDF → Extract text → Chunk → Embed → Store → Retrieve
-4. **LLM Generation** → Groq Llama 3.1 synthesizes response with citations
-5. **Response** → Frontend with sources
+# 💻 Tech Stack
+
+## Backend
+
+| Technology        | Purpose                           |
+| ----------------- | --------------------------------- |
+| FastAPI           | High-performance Python API       |
+| LangGraph         | Agent workflow orchestration      |
+| LangChain         | LLM abstraction + prompt handling |
+| Supabase pgvector | Persistent vector database        |
+| Groq Cloud        | Llama-3.1 inference               |
+| Jina AI           | High-speed embeddings API         |
+| PyMuPDF           | PDF text extraction               |
+| Redis             | Conversation memory persistence   |
+| ArXiv API         | Research paper retrieval          |
 
 ---
 
-## 💻 Tech Stack
+## Frontend
 
-### Backend
-
-| Technology                | Purpose                                         |
-| ------------------------- | ----------------------------------------------- |
-| **FastAPI**               | High-performance async REST API                 |
-| **LangGraph**             | Agentic workflow orchestration & decision logic |
-| **LangChain**             | LLM framework & prompt management               |
-| **ChromaDB**              | Vector database for semantic search             |
-| **Groq Cloud**            | Llama 3.1 inference (100+ tokens/sec)           |
-| **ArXiv API**             | Research paper retrieval                        |
-| **PyMuPDF**               | PDF text extraction                             |
-| **Sentence Transformers** | Text embeddings (all-MiniLM-L6-v2)              |
-
-### Frontend
-
-| Technology      | Purpose                                    |
-| --------------- | ------------------------------------------ |
-| **Next.js 16**  | React framework with server-side rendering |
-| **TypeScript**  | Type-safe development                      |
-| **TailwindCSS** | Responsive UI styling                      |
-| **API Proxy**   | CORS-free backend communication            |
-
-### DevOps
-
-| Tool           | Purpose                          |
-| -------------- | -------------------------------- |
-| **Render**     | Backend deployment (FastAPI)     |
-| **Vercel**     | Frontend deployment (Next.js)    |
-| **Git/GitHub** | Version control & CI/CD triggers |
+| Technology  | Purpose            |
+| ----------- | ------------------ |
+| Next.js     | React framework    |
+| TypeScript  | Type-safe frontend |
+| TailwindCSS | UI styling         |
+| Vercel      | Frontend hosting   |
 
 ---
 
-## 🚀 Deployment Architecture
+## DevOps
+
+| Tool     | Purpose                 |
+| -------- | ----------------------- |
+| Render   | Backend deployment      |
+| Vercel   | Frontend deployment     |
+| GitHub   | Version control         |
+| Supabase | Vector database hosting |
+
+---
+
+# 🚀 Deployment Architecture
 
 ```
-User Request
-    ↓
+
+User
+↓
 Vercel (Next.js Frontend)
-    ↓ HTTPS
+↓
 Render (FastAPI Backend)
-    ↓
+↓
 LangGraph Agent
-    ├─→ ChromaDB (Vector Search)
-    ├─→ ArXiv API (Paper Fetch)
-    └─→ Groq Cloud (LLM Inference)
+↓
+Supabase pgvector
+↓
+Jina Embedding API
+↓
+Groq Llama-3.1
+
 ```
-
-**Live URLs:**
-
-- Frontend: `https://agentic-rag-research-assistant-lb5yixibp.vercel.app`
-- Backend API: `https://agentic-rag-backend-jy8a.onrender.com/`
 
 ---
 
-## 🧠 Technical Highlights
+# 🌐 Live Deployment
 
-### 1. **Agentic Decision Making**
+Frontend  
+https://agentic-rag-research-assistant-lb5yixibp.vercel.app
 
-The system uses LangGraph's state machine to autonomously decide whether to:
-
-- Answer from existing vector DB knowledge
-- Trigger real-time paper ingestion pipeline
-
-```python
-# Simplified agent logic
-workflow.add_conditional_edges(
-    "retrieve_and_check",
-    route_research  # Autonomous routing based on knowledge availability
-)
-```
-
-### 2. **RAG Pipeline**
-
-- **Document Processing**: PyMuPDF extracts text from ArXiv PDFs
-- **Chunking**: RecursiveCharacterTextSplitter (1000 chars, 100 overlap)
-- **Embedding**: Sentence Transformers (all-MiniLM-L6-v2, 384-dim vectors)
-- **Storage**: ChromaDB with metadata for citation tracking
-- **Retrieval**: Top-K semantic similarity search (k=3)
-
-### 3. **Conversational Context**
-
-- Session-based chat history management
-- Context window: 3 follow-up questions per topic
-- Redis-backed message history (scalable for multi-user)
-
-### 4. **Production-Ready Features**
-
-- CORS configuration for cross-origin requests
-- Environment-based configuration (.env management)
-- Error handling with detailed HTTP status codes
-- Timeout handling for long-running LLM requests
-- Animated loading states for better UX
+Backend API  
+https://agentic-rag-backend-jy8a.onrender.com
 
 ---
 
-## 📊 Performance Metrics
+# 🧠 Key Technical Highlights
 
-| Metric               | Value                              |
-| -------------------- | ---------------------------------- |
-| **LLM Inference**    | ~500ms (Groq Llama 3.1)            |
-| **Vector Search**    | <100ms (ChromaDB)                  |
-| **PDF Ingestion**    | ~10s per paper (ArXiv → Vector DB) |
-| **Total Cold Start** | <2s (without paper download)       |
+## 1️⃣ Agentic Decision Engine
+
+The system uses **LangGraph's state machine** to determine whether existing knowledge is sufficient or new research must be performed.
+
+```
+
+retrieve_and_check
+↓
+decision
+├─ generate_answer
+└─ do_research
+
+```
+
+If the context retrieved from the vector database is insufficient, the agent automatically triggers the research pipeline.
 
 ---
 
-## 📁 Repository Structure
+# 2️⃣ Research Paper Ingestion Pipeline
+
+When the system detects missing knowledge:
+
+1️⃣ Search ArXiv  
+2️⃣ Download PDF  
+3️⃣ Extract text using PyMuPDF  
+4️⃣ Split text into semantic chunks  
+5️⃣ Generate embeddings using Jina API  
+6️⃣ Store vectors in Supabase pgvector  
+7️⃣ Retrieve relevant chunks for answer generation
+
+---
+
+# 3️⃣ Optimized Embedding Pipeline
+
+The system uses **batch embeddings** to dramatically reduce latency.
+
+Instead of:
 
 ```
+
+100 chunks → 100 API calls
+
+```
+
+It performs:
+
+```
+
+100 chunks → ~3 batch calls
+
+```
+
+Benefits:
+
+- significantly faster ingestion
+- reduced API calls
+- lower embedding latency
+
+---
+
+# 4️⃣ Persistent Vector Database
+
+Vectors are stored in **Supabase pgvector**, enabling:
+
+• persistent storage  
+• scalable vector search  
+• SQL-based similarity queries
+
+Example vector similarity function:
+
+```
+
+match_documents(query_embedding vector, match_count int)
+
+```
+
+---
+
+# 💬 Conversational Memory
+
+User conversations are stored in **Redis**.
+
+This enables:
+
+• multi-turn conversation context  
+• follow-up questions  
+• scalable memory for multiple users
+
+---
+
+# 📊 Performance Metrics
+
+| Metric          | Value      |
+| --------------- | ---------- |
+| LLM inference   | ~400-600ms |
+| Vector search   | ~50-100ms  |
+| Paper ingestion | ~3-8s      |
+| Cold start      | ~2s        |
+
+---
+
+# 📁 Repository Structure
+
+```
+
 Agentic_RAG/
+│
 ├── backend/
-│   ├── main.py              # FastAPI application
-│   ├── agent.py             # LangGraph agentic workflow
-│   ├── ingest.py            # ArXiv paper ingestion pipeline
-│   ├── requirements.txt     # Python dependencies
-│   └── render.yaml          # Render deployment config
+│   ├── main.py
+│   ├── agent.py
+│   ├── ingest.py
+│   ├── requirements.txt
+│   └── runtime.txt
 │
 ├── frontend/
 │   ├── app/
-│   │   ├── page.tsx         # Chat interface with real-time updates
-│   │   ├── layout.tsx       # App layout & metadata
-│   │   └── globals.css      # TailwindCSS styles
-│   ├── next.config.ts       # API proxy & build config
-│   └── package.json         # Node.js dependencies
+│   ├── components/
+│   ├── next.config.ts
+│   └── package.json
 │
-├── system_architecture.png  # Architecture diagram
-├── README.md               # This file
-└── .gitignore              # Exclude secrets & build artifacts
+├── system_architecture.png
+├── README.md
+└── .gitignore
+
 ```
 
 ---
 
-## 🔐 Environment Configuration
+# 🔐 Environment Configuration
 
-### Backend (.env)
+## Backend (.env)
 
-```env
-GROQ_API_KEY=<your_groq_api_key>
 ```
 
-### Frontend (.env.local)
+GROQ_API_KEY=
+JINA_API_KEY=
+SUPABASE_URL=
+SUPABASE_KEY=
+REDIS_URL=
 
-```env
-NEXT_PUBLIC_BACKEND_URL=<your_render_backend_url>
 ```
 
 ---
 
-## 🌟 Future Enhancements
+## Frontend (.env.local)
 
-- [ ] Multi-user authentication (Auth0/Clerk)
-- [ ] Persistent vector DB (Pinecone/Weaviate)
-- [ ] Streaming responses (Server-Sent Events)
-- [ ] Advanced citation formatting (APA/MLA)
-- [ ] Multi-source ingestion (Google Scholar, PubMed)
-- [ ] Query analytics dashboard
+```
 
----
+NEXT_PUBLIC_BACKEND_URL=
 
-## 📜 License
-
-MIT License - See [LICENSE](LICENSE) for details
+```
 
 ---
 
-## 👤 Author
+# 🌟 Future Improvements
 
-**[Your Name]**  
-Data Science & Machine Learning | Full-Stack AI Engineer  
-📧 your.email@example.com | 🔗 [LinkedIn](https://linkedin.com/in/yourprofile) | 💻 [GitHub](https://github.com/yourusername)
+Planned upgrades:
 
----
-
-## 🙏 Acknowledgments
-
-- **Groq** for lightning-fast LLM inference
-- **LangChain** for the powerful agent framework
-- **ArXiv** for open research paper access
-- **Render** & **Vercel** for seamless deployment
+- Streaming responses (Server-Sent Events)
+- Multi-source research ingestion
+- Semantic caching layer
+- Knowledge deduplication
+- Paper summarization
+- Authentication (Clerk / Auth0)
+- Query analytics dashboard
 
 ---
 
-**⭐ If you find this project interesting, please consider giving it a star!**
+# 👤 Author
+
+**Harshal Sharma**
+
+AI / ML Engineer | Full-Stack AI Systems
+
+GitHub  
+https://github.com/Harshalsharma05
+
+LinkedIn  
+https://www.linkedin.com/in/harshal-sharma-98851b2ab
+
+---
+
+# 🙏 Acknowledgements
+
+Groq  
+LangChain  
+LangGraph  
+Supabase  
+Jina AI  
+ArXiv
+
+---
+
+⭐ If you find this project interesting, consider giving the repository a star.
