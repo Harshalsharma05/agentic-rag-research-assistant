@@ -3,12 +3,10 @@ import requests
 from dotenv import load_dotenv
 from typing import TypedDict, List, Dict, Any
 
-import chromadb
-from chromadb.config import Settings
+from supabase import create_client
 from langgraph.graph import StateGraph, END
 from langchain_groq import ChatGroq
 
-# Load environment variables
 load_dotenv()
 
 # -------------------------------
@@ -21,6 +19,14 @@ llm = ChatGroq(
     groq_api_key=os.getenv("GROQ_API_KEY")
 )
 
+# -------------------------------
+# Supabase Client
+# -------------------------------
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # -------------------------------
 # Jina Embedding API
@@ -30,54 +36,29 @@ JINA_API_KEY = os.getenv("JINA_API_KEY")
 
 session = requests.Session()
 
+
 def get_embedding(text: str):
 
     response = session.post(
-    "https://api.jina.ai/v1/embeddings",
-    headers={
-        "Authorization": f"Bearer {JINA_API_KEY}",
-        "Content-Type": "application/json",
-    },
-    json={
-        "model": "jina-embeddings-v2-base-en",
-        "input": text
-    },
-    timeout=30
-)
+        "https://api.jina.ai/v1/embeddings",
+        headers={
+            "Authorization": f"Bearer {JINA_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": "jina-embeddings-v2-base-en",
+            "input": text
+        },
+        timeout=30
+    )
 
     if response.status_code != 200:
         raise RuntimeError(
             f"Jina embedding API error: {response.status_code} - {response.text}"
         )
 
-    data = response.json()
+    return response.json()["data"][0]["embedding"]
 
-    return data["data"][0]["embedding"]
-
-
-class JinaEmbeddingFunction:
-
-    def embed_documents(self, texts: List[str]):
-        return [get_embedding(text) for text in texts]
-
-    def embed_query(self, text: str):
-        return get_embedding(text)
-
-
-embeddings = JinaEmbeddingFunction()
-
-# -------------------------------
-# Vector Database
-# -------------------------------
-
-persist_directory = "./chroma_db"
-
-chroma_client = chromadb.PersistentClient(
-    path=persist_directory,
-    settings=Settings(anonymized_telemetry=False)
-)
-
-vector_db = chroma_client.get_or_create_collection("langchain")
 
 # -------------------------------
 # Agent State
@@ -96,18 +77,43 @@ class AgentState(TypedDict):
 # Helper: format conversation
 # -------------------------------
 
-def format_history(history: List[Dict[str, Any]]) -> str:
+def format_history(history):
 
     if not history:
         return "No previous conversation."
 
-    formatted_msgs = []
+    formatted = []
 
     for msg in history:
         role = "User" if msg["role"] == "user" else "AI Assistant"
-        formatted_msgs.append(f"{role}: {msg['content']}")
+        formatted.append(f"{role}: {msg['content']}")
 
-    return "\n".join(formatted_msgs)
+    return "\n".join(formatted)
+
+
+# -------------------------------
+# Supabase Retrieval
+# -------------------------------
+
+def retrieve_documents(query: str):
+
+    query_embedding = get_embedding(query)
+
+    response = supabase.rpc(
+        "match_documents",
+        {
+            "query_embedding": query_embedding,
+            "match_count": 3
+        }
+    ).execute()
+
+    if not response.data:
+        return [], []
+
+    documents = [row["content"] for row in response.data]
+    metadatas = [row["metadata"] for row in response.data]
+
+    return documents, metadatas
 
 
 # -------------------------------
@@ -121,18 +127,10 @@ def retrieve_and_check(state: AgentState):
     query = state["query"]
     history_str = format_history(state["chat_history"])
 
-    results = vector_db.query(
-        query_embeddings=[embeddings.embed_query(query)],
-        n_results=3,
-    )
-
-    documents = results.get("documents", [])
-    metadatas = results.get("metadatas", [])
-
-    documents = documents[0] if documents else []
-    metadatas = metadatas[0] if metadatas else []
+    documents, metadatas = retrieve_documents(query)
 
     context_text = "\n\n".join(documents)
+
     sources = list(
         {
             metadata.get("source", "Unknown")
@@ -142,25 +140,25 @@ def retrieve_and_check(state: AgentState):
     )
 
     decision_prompt = f"""
-You are a strict evaluator. Read the conversation history, the user's latest query, and the retrieved context.
+You are a strict evaluator.
 
-Does the retrieved context contain enough relevant information to answer the latest query?
+Does the retrieved context contain enough relevant information to answer the query?
 
-Reply with EXACTLY "YES" or "NO".
+Reply ONLY "YES" or "NO".
 
 Conversation History:
 {history_str}
 
-Latest Query:
+Query:
 {query}
 
-Retrieved Context:
+Context:
 {context_text}
 """
 
     decision = llm.invoke(decision_prompt).content.strip().upper()
 
-    print("Agent Knowledge Check Decision:", decision)
+    print("Knowledge Check:", decision)
 
     needs_research = "NO" in decision or not context_text.strip()
 
@@ -175,7 +173,7 @@ Retrieved Context:
 
 
 # -------------------------------
-# Node 2: Research (Stage 2)
+# Node 2: Research
 # -------------------------------
 
 def do_research(state: AgentState):
@@ -185,54 +183,37 @@ def do_research(state: AgentState):
     query = state["query"]
     history_str = format_history(state["chat_history"])
 
-    search_query_prompt = f"""
-Based on the conversation history and the latest question,
-generate a short 2–3 keyword search phrase for ArXiv.
-
-ONLY output the keywords.
+    search_prompt = f"""
+Generate a short 2-3 keyword search phrase for ArXiv.
 
 Conversation History:
 {history_str}
 
-Latest Question:
+Question:
 {query}
 """
 
-    arxiv_query = llm.invoke(search_query_prompt).content.strip()
+    arxiv_query = llm.invoke(search_prompt).content.strip()
 
-    print("Generated ArXiv Query:", arxiv_query)
+    print("ArXiv Search:", arxiv_query)
 
     try:
         from ingest import ingest_arxiv_papers
-
         ingest_arxiv_papers(arxiv_query, max_results=1)
     except Exception as e:
-        print(f"[RESEARCH WARNING] Failed to ingest new papers: {str(e)}")
+        print("[RESEARCH WARNING]", str(e))
 
-    results = vector_db.query(
-        query_embeddings=[embeddings.embed_query(query)],
-        n_results=3,
+    documents, metadatas = retrieve_documents(query)
+
+    context_text = "\n\n".join(documents)
+
+    sources = list(
+        {
+            metadata.get("source", "Unknown")
+            for metadata in metadatas
+            if metadata
+        }
     )
-
-    documents = []
-    metadatas = []
-
-    if results and "documents" in results and results["documents"]:
-        documents = results["documents"][0]
-
-    if results and "metadatas" in results and results["metadatas"]:
-        metadatas = results["metadatas"][0]
-
-    if not documents:
-        context_text = ""
-    else:
-        context_text = "\n\n".join(documents)
-    
-    sources = []
-    for m in metadatas:
-        if isinstance(m, dict) and "source" in m:
-            sources.append(m["source"])
-    sources = list(set(sources))    
 
     return {
         "query": state["query"],
@@ -259,15 +240,15 @@ def generate_answer(state: AgentState):
     prompt = f"""
 You are an AI Research Assistant.
 
-Use the retrieved research context and the conversation history to answer the user's latest question.
+Use the context and conversation history to answer the question.
 
 Conversation History:
 {history_str}
 
-Retrieved Context:
+Context:
 {context_text}
 
-Latest Question:
+Question:
 {query}
 
 Answer:
@@ -298,7 +279,7 @@ def route_research(state: AgentState):
 
 
 # -------------------------------
-# Build LangGraph Workflow
+# Build Graph
 # -------------------------------
 
 workflow = StateGraph(AgentState)
@@ -318,8 +299,6 @@ workflow.add_edge("do_research", "generate_answer")
 workflow.add_edge("generate_answer", END)
 
 agent_app = workflow.compile()
-
-
 
 
 
