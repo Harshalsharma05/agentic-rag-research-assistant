@@ -1,4 +1,6 @@
 import os
+import re
+import json
 import requests
 from dotenv import load_dotenv
 from typing import TypedDict, List, Dict, Any
@@ -33,6 +35,9 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 # -------------------------------
 
 JINA_API_KEY = os.getenv("JINA_API_KEY")
+JINA_EMBEDDING_MODEL = os.getenv("JINA_EMBEDDING_MODEL", "jina-embeddings-v3")
+JINA_QUERY_TASK = os.getenv("JINA_QUERY_TASK", "retrieval.query")
+JINA_EMBEDDING_DIMENSIONS = int(os.getenv("JINA_EMBEDDING_DIMENSIONS", "1024"))
 
 session = requests.Session()
 
@@ -46,7 +51,8 @@ def get_embedding(text: str):
             "Content-Type": "application/json",
         },
         json={
-            "model": "jina-embeddings-v2-base-en",
+            "model": JINA_EMBEDDING_MODEL,
+            "task": JINA_QUERY_TASK,
             "input": text
         },
         timeout=30
@@ -57,7 +63,29 @@ def get_embedding(text: str):
             f"Jina embedding API error: {response.status_code} - {response.text}"
         )
 
-    return response.json()["data"][0]["embedding"]
+    embedding = response.json()["data"][0]["embedding"]
+
+    if len(embedding) != JINA_EMBEDDING_DIMENSIONS:
+        raise RuntimeError(
+            f"Jina embedding dimension mismatch: expected {JINA_EMBEDDING_DIMENSIONS}, got {len(embedding)}"
+        )
+
+    return embedding
+
+
+def sanitize_arxiv_query(raw_query: str) -> str:
+
+    cleaned = raw_query.strip()
+
+    quoted_match = re.search(r'"([^"]+)"', cleaned)
+    if quoted_match:
+        cleaned = quoted_match.group(1)
+
+    cleaned = cleaned.splitlines()[-1].strip().strip('"\'')
+    cleaned = re.sub(r"\s+", " ", cleaned)
+
+    terms = re.findall(r"[A-Za-z0-9][A-Za-z0-9+\-.]*", cleaned)
+    return " ".join(terms[:8])
 
 
 # -------------------------------
@@ -111,7 +139,18 @@ def retrieve_documents(query: str):
         return [], []
 
     documents = [row["content"] for row in response.data]
-    metadatas = [row["metadata"] for row in response.data]
+
+    metadatas = []
+    for row in response.data:
+        m = row.get("metadata", {})
+        if isinstance(m, str):
+            try:
+                m = json.loads(m)
+            except Exception:
+                m = {}
+        metadatas.append(m if isinstance(m, dict) else {})
+
+    print(f"[RETRIEVAL] {len(documents)} docs, sources: {[m.get('source', 'Unknown') for m in metadatas]}")
 
     return documents, metadatas
 
@@ -138,6 +177,7 @@ def retrieve_and_check(state: AgentState):
             if metadata
         }
     )
+    sources = [s for s in sources if s != "Unknown"]
 
     decision_prompt = f"""
 You are a strict evaluator.
@@ -184,7 +224,14 @@ def do_research(state: AgentState):
     history_str = format_history(state["chat_history"])
 
     search_prompt = f"""
-Generate a short 2-3 keyword search phrase for ArXiv.
+Generate a concise ArXiv search phrase using 2 to 6 terms.
+Return ONLY the search phrase.
+Do not add quotes.
+Do not add labels.
+Do not add explanation.
+
+Example output:
+multimodal model comparison
 
 Conversation History:
 {history_str}
@@ -193,13 +240,18 @@ Question:
 {query}
 """
 
-    arxiv_query = llm.invoke(search_prompt).content.strip()
+    raw_arxiv_query = llm.invoke(search_prompt).content.strip()
+    arxiv_query = sanitize_arxiv_query(raw_arxiv_query) or sanitize_arxiv_query(query)
 
-    print("ArXiv Search:", arxiv_query)
+    print("ArXiv Search Raw:", raw_arxiv_query)
+    print("ArXiv Search Sanitized:", arxiv_query)
 
+    arxiv_sources = []
     try:
         from ingest import ingest_arxiv_papers
-        ingest_arxiv_papers(arxiv_query, max_results=1)
+        ingested = ingest_arxiv_papers(arxiv_query, max_results=1)
+        if ingested:
+            arxiv_sources = ingested
     except Exception as e:
         print("[RESEARCH WARNING]", str(e))
 
@@ -214,6 +266,11 @@ Question:
             if metadata
         }
     )
+
+    # Remove uninformative "Unknown" entries; fall back to arxiv paper titles
+    sources = [s for s in sources if s != "Unknown"]
+    if not sources:
+        sources = arxiv_sources
 
     return {
         "query": state["query"],

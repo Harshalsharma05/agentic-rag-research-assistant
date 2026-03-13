@@ -1,9 +1,12 @@
 import os
 import arxiv
 import requests
+from dotenv import load_dotenv
 from supabase import create_client
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+load_dotenv()
 
 # --------------------------------
 # Supabase Configuration
@@ -19,6 +22,9 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 # --------------------------------
 
 JINA_API_KEY = os.getenv("JINA_API_KEY")
+JINA_EMBEDDING_MODEL = os.getenv("JINA_EMBEDDING_MODEL", "jina-embeddings-v3")
+JINA_PASSAGE_TASK = os.getenv("JINA_PASSAGE_TASK", "retrieval.passage")
+JINA_EMBEDDING_DIMENSIONS = int(os.getenv("JINA_EMBEDDING_DIMENSIONS", "1024"))
 
 
 def get_embedding(text: str):
@@ -30,7 +36,8 @@ def get_embedding(text: str):
             "Content-Type": "application/json",
         },
         json={
-            "model": "jina-embeddings-v2-base-en",
+            "model": JINA_EMBEDDING_MODEL,
+            "task": JINA_PASSAGE_TASK,
             "input": text
         },
         timeout=30
@@ -41,7 +48,14 @@ def get_embedding(text: str):
             f"Jina API error {response.status_code}: {response.text}"
         )
 
-    return response.json()["data"][0]["embedding"]
+    embedding = response.json()["data"][0]["embedding"]
+
+    if len(embedding) != JINA_EMBEDDING_DIMENSIONS:
+        raise RuntimeError(
+            f"Jina embedding dimension mismatch: expected {JINA_EMBEDDING_DIMENSIONS}, got {len(embedding)}"
+        )
+
+    return embedding
 
 
 def embed_chunks(chunks, batch_size=32):
@@ -59,15 +73,31 @@ def embed_chunks(chunks, batch_size=32):
                 "Content-Type": "application/json",
             },
             json={
-                "model": "jina-embeddings-v2-base-en",
+                "model": JINA_EMBEDDING_MODEL,
+                "task": JINA_PASSAGE_TASK,
                 "input": batch
             },
             timeout=30
         )
 
+        if response.status_code != 200:
+            raise RuntimeError(
+                f"Jina batch embedding API error {response.status_code}: {response.text}"
+            )
+
         data = response.json()["data"]
 
-        all_embeddings.extend([item["embedding"] for item in data])
+        batch_embeddings = [item["embedding"] for item in data]
+        bad_embedding = next(
+            (embedding for embedding in batch_embeddings if len(embedding) != JINA_EMBEDDING_DIMENSIONS),
+            None,
+        )
+        if bad_embedding is not None:
+            raise RuntimeError(
+                f"Jina embedding dimension mismatch: expected {JINA_EMBEDDING_DIMENSIONS}, got {len(bad_embedding)}"
+            )
+
+        all_embeddings.extend(batch_embeddings)
 
     return all_embeddings
 
@@ -76,7 +106,8 @@ def embed_chunks(chunks, batch_size=32):
 # Ingestion Pipeline
 # --------------------------------
 
-def ingest_arxiv_papers(search_query: str, max_results: int = 1):
+def ingest_arxiv_papers(search_query: str, max_results: int = 1) -> list:
+    """Ingest arxiv papers into Supabase. Returns list of paper source strings."""
 
     try:
         import fitz
@@ -99,7 +130,7 @@ def ingest_arxiv_papers(search_query: str, max_results: int = 1):
 
     if not results:
         print("No papers found.")
-        return
+        return []
 
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
@@ -109,9 +140,28 @@ def ingest_arxiv_papers(search_query: str, max_results: int = 1):
     if not os.path.exists("downloads"):
         os.makedirs("downloads")
 
+    paper_sources = []
+
     for paper in results:
 
+        source_label = f"{paper.title} ({paper.published.year})"
+
+        # Skip if paper already exists in Supabase (prevents duplicate flooding)
+        try:
+            existing = supabase.table("documents") \
+                .select("id") \
+                .filter("metadata->>source", "eq", source_label) \
+                .limit(1) \
+                .execute()
+            if existing.data:
+                print(f"[SKIP] Already in knowledge base: {paper.title}")
+                paper_sources.append(source_label)
+                continue
+        except Exception as e:
+            print(f"[DEDUP WARNING] Could not check duplicates: {e}")
+
         print(f"\nProcessing: {paper.title}")
+        paper_sources.append(source_label)
 
         pdf_path = f"downloads/{paper.get_short_id()}.pdf"
 
@@ -138,13 +188,14 @@ def ingest_arxiv_papers(search_query: str, max_results: int = 1):
         print(f"{len(chunks)} chunks created")
 
         metadatas = [
-            {"source": f"{paper.title} ({paper.published.year})"}
+            {"source": source_label}
             for _ in chunks
         ]
 
         print("Generating embeddings...")
 
         embeddings = embed_chunks(chunks)
+        print(f"[EMBEDDINGS] Generated {len(embeddings)} vectors with dimension {len(embeddings[0]) if embeddings else 0}")
 
         print("Storing vectors in Supabase...")
 
@@ -158,9 +209,13 @@ def ingest_arxiv_papers(search_query: str, max_results: int = 1):
                 "embedding": embedding
             })
 
-        supabase.table("documents").insert(rows).execute()
+        insert_result = supabase.table("documents").insert(rows).execute()
+        print(f"[SUPABASE INSERT] Inserted {len(rows)} rows for {source_label}")
+        if getattr(insert_result, "data", None) is not None:
+            print(f"[SUPABASE INSERT RESULT] Returned {len(insert_result.data)} rows")
 
     print("\nKnowledge base updated successfully")
+    return paper_sources
 
 
 # --------------------------------

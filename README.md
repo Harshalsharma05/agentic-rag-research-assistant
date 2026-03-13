@@ -2,8 +2,8 @@
 
 > **An autonomous AI research assistant** that intelligently retrieves information from a vector database or dynamically fetches and processes ArXiv papers on-demand using LangGraph decision workflows.
 
-[![Live Demo](https://img.shields.io/badge/Demo-Live-success?style=for-the-badge)](https://your-vercel-url.vercel.app)
-[![Backend API](https://img.shields.io/badge/API-Deployed-blue?style=for-the-badge)](https://your-render-url.onrender.com)
+[![Live Demo](https://img.shields.io/badge/Demo-Live-success?style=for-the-badge)](https://agentic-rag-research-assistant-lb5yixibp.vercel.app/)
+[![Backend API](https://img.shields.io/badge/API-Deployed-blue?style=for-the-badge)](https://agentic-rag-backend-jy8a.onrender.com/)
 
 ---
 
@@ -89,8 +89,8 @@ LangGraph Agent
 
 **Live URLs:**
 
-- Frontend: `https://your-vercel-url.vercel.app`
-- Backend API: `https://your-render-url.onrender.com`
+- Frontend: `https://agentic-rag-research-assistant-lb5yixibp.vercel.app`
+- Backend API: `https://agentic-rag-backend-jy8a.onrender.com/`
 
 ---
 

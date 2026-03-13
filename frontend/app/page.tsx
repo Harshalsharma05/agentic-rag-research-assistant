@@ -9,6 +9,17 @@ type Message = {
   sources?: string[];
 };
 
+function getArxivSearchUrl(source: string) {
+  const normalizedSource = source.replace(/^Processing:\s*/i, "").trim();
+  const params = new URLSearchParams({
+    query: normalizedSource,
+    searchtype: "all",
+    source: "header",
+  });
+
+  return `https://arxiv.org/search/?${params.toString()}`;
+}
+
 // Animated loading indicator component
 function LoadingIndicator({ step }: { step: number }) {
   const steps = [
@@ -129,6 +140,10 @@ export default function Home() {
 
       const data = await res.json();
 
+      console.log("[BACKEND RESPONSE]", JSON.stringify(data, null, 2));
+      console.log("[SOURCES RECEIVED]", data.sources);
+      console.log("[RESPONSE TEXT]", data.response?.slice(0, 200));
+
       // Append AI response to chat history
       setMessages((prev) => [
         ...prev,
@@ -215,7 +230,19 @@ export default function Home() {
                         Sources:{" "}
                       </span>
                       <span className="text-xs text-gray-400">
-                        {msg.sources.join(", ")}
+                        {msg.sources.map((source, sourceIndex) => (
+                          <span key={`${source}-${sourceIndex}`}>
+                            <a
+                              href={getArxivSearchUrl(source)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-blue-600 underline hover:text-blue-700"
+                            >
+                              {source}
+                            </a>
+                            {sourceIndex < msg.sources!.length - 1 ? ", " : ""}
+                          </span>
+                        ))}
                       </span>
                     </div>
                   )}
