@@ -5,6 +5,7 @@ langchain
 langchain-community
 langchain-groq
 langchain-huggingface
+huggingface-hub
 arxiv
 pymupdf
 chromadb

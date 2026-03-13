@@ -6,7 +6,6 @@ from langgraph.graph import StateGraph, END
 # Import Groq instead of Ollama
 from langchain_groq import ChatGroq 
 from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from ingest import ingest_arxiv_papers
 
