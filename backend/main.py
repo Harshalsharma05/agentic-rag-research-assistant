@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
 import os
 
 app = FastAPI(title="AI Research Copilot API")
@@ -43,47 +42,56 @@ class QueryRequest(BaseModel):
 
 @app.post("/api/chat")
 def chat_with_llm(request: QueryRequest):
+    print(f"\n[NEW REQUEST] {request.query} | [SESSION] {request.session_id}")
+
+    formatted_history = []
+    redis_history = None
+
+    # Redis-backed history is optional. If Redis is unavailable, continue stateless.
     try:
-        print(f"\n[NEW REQUEST] {request.query} | [SESSION] {request.session_id}")
-        
-        # Lazy import Redis to avoid startup issues
         from langchain_community.chat_message_histories import RedisChatMessageHistory
-        
-        # 2. Connect to Memurai (Redis) on default port 6379
+
         redis_url = os.environ.get("REDIS_URL")
         redis_history = RedisChatMessageHistory(
-            request.session_id, 
+            request.session_id,
             url=redis_url or "redis://localhost:6379"
         )
-        
-        # 3. Format Redis history into the dict format our agent.py expects
-        formatted_history =[]
+
         for msg in redis_history.messages:
             role = "user" if msg.type == "human" else "assistant"
             formatted_history.append({"role": role, "content": msg.content})
-            
+
         print(f"[REDIS MEMORY] Loaded {len(formatted_history)} previous messages.")
-        
-        # 4. Run the Agent (lazy loaded)
+    except Exception as e:
+        print(f"[REDIS WARNING] {str(e)}")
+        print("[REDIS WARNING] Continuing without persisted chat history.")
+
+    try:
         agent = get_agent()
         initial_state = {
-            "query": request.query, 
+            "query": request.query,
             "chat_history": formatted_history,
-            "context": "", 
-            "sources":[], 
-            "needs_research": False, 
+            "context": "",
+            "sources": [],
+            "needs_research": False,
             "response": ""
         }
-        
+
         result = agent.invoke(initial_state)
     except Exception as e:
-        print(f"[ERROR] {str(e)}")
-        raise HTTPException(status_code=500, detail="An error occurred while processing the request.")
-    
-    # 5. Save the new conversation turn back to Redis!
-    redis_history.add_user_message(request.query)
-    redis_history.add_ai_message(result["response"])
-    
+        print(f"[AGENT ERROR] {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Agent processing failed: {str(e)}"
+        )
+
+    if redis_history is not None:
+        try:
+            redis_history.add_user_message(request.query)
+            redis_history.add_ai_message(result["response"])
+        except Exception as e:
+            print(f"[REDIS SAVE WARNING] {str(e)}")
+
     return {
         "response": result["response"],
         "sources": result["sources"]

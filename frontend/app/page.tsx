@@ -102,10 +102,7 @@ export default function Home() {
     setLoading(true);
 
     try {
-      // Send request (now including chat_history!)
-      // const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
-
-      const res = await fetch(`https://agentic-rag-backend-jy8a.onrender.com/api/chat`, {
+      const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -117,9 +114,17 @@ export default function Home() {
           // })), // Send previous history
         }),
       });
-
       if (!res.ok) {
-        throw new Error(`Backend returned HTTP ${res.status}`);
+        let errorMessage = `Backend returned HTTP ${res.status}`;
+        try {
+          const errorBody = await res.json();
+          if (errorBody?.detail) {
+            errorMessage = String(errorBody.detail);
+          }
+        } catch {
+          // No JSON body is fine; keep default HTTP-based error.
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await res.json();
@@ -137,7 +142,13 @@ export default function Home() {
       console.error("Error fetching data:", error);
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Error connecting to the backend." },
+        {
+          role: "assistant",
+          content:
+            error instanceof Error
+              ? `Error connecting to the backend: ${error.message}`
+              : "Error connecting to the backend.",
+        },
       ]);
     } finally {
       setLoading(false);
