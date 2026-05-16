@@ -1,4 +1,4 @@
-# 🤖 AI Research Copilot — Agentic RAG Research Assistant
+# AI Research Copilot — Agentic RAG Research Assistant
 
 [![Live Demo](https://img.shields.io/badge/Demo-Live-success?style=for-the-badge)](https://agentic-rag-research-assistant-lb5yixibp.vercel.app/)
 [![Backend API](https://img.shields.io/badge/API-Deployed-blue?style=for-the-badge)](https://agentic-rag-backend-jy8a.onrender.com/)
@@ -9,7 +9,7 @@ Built using **LangGraph agent workflows**, **Supabase pgvector**, **Groq Llama-3
 
 ---
 
-# 🎯 Project Overview
+# Project Overview
 
 AI Research Copilot is a **production-grade Agentic Retrieval-Augmented Generation (RAG) system**.
 
@@ -19,7 +19,7 @@ This allows the assistant to **continuously grow its research knowledge during c
 
 ---
 
-# 🔑 Core Features
+# Core Features
 
 ✅ **Agentic AI Workflow** powered by LangGraph  
 ✅ **Dynamic Knowledge Expansion** through ArXiv ingestion  
@@ -32,13 +32,13 @@ This allows the assistant to **continuously grow its research knowledge during c
 
 ---
 
-# 🏗 System Architecture
+# System Architecture
 
 ![System Architecture](system_architecture.png)
 
 ---
 
-# 💻 Tech Stack
+# Tech Stack
 
 ## Backend
 
@@ -78,7 +78,7 @@ This allows the assistant to **continuously grow its research knowledge during c
 
 ---
 
-# 🚀 Deployment Architecture
+# Deployment Architecture
 
 ```
 
@@ -100,7 +100,7 @@ Groq Llama-3.1
 
 ---
 
-# 🌐 Live Deployment
+# Live Deployment
 
 Frontend  
 https://agentic-rag-research-assistant-lb5yixibp.vercel.app
@@ -110,7 +110,7 @@ https://agentic-rag-backend-jy8a.onrender.com
 
 ---
 
-# 🧠 Key Technical Highlights
+# Key Technical Highlights
 
 ## 1️⃣ Agentic Decision Engine
 
@@ -190,7 +190,7 @@ match_documents(query_embedding vector, match_count int)
 
 ---
 
-# 💬 Conversational Memory
+# Conversational Memory
 
 User conversations are stored in **Redis**.
 
@@ -202,7 +202,7 @@ This enables:
 
 ---
 
-# 📊 Performance Metrics
+# Performance Metrics
 
 | Metric          | Value      |
 | --------------- | ---------- |
@@ -213,7 +213,7 @@ This enables:
 
 ---
 
-# 📁 Repository Structure
+# Repository Structure
 
 ```
 
@@ -240,7 +240,7 @@ Agentic_RAG/
 
 ---
 
-# 🔐 Environment Configuration
+# Environment Configuration
 
 ## Backend (.env)
 
@@ -266,7 +266,7 @@ NEXT_PUBLIC_BACKEND_URL=
 
 ---
 
-# 🌟 Future Improvements
+# Future Improvements
 
 Planned upgrades:
 
@@ -280,7 +280,7 @@ Planned upgrades:
 
 ---
 
-# 👤 Author
+# Author
 
 **Harshal Sharma**
 
@@ -294,7 +294,7 @@ https://www.linkedin.com/in/harshal-sharma-98851b2ab
 
 ---
 
-# 🙏 Acknowledgements
+# Acknowledgements
 
 Groq  
 LangChain  
