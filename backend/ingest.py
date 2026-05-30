@@ -3,17 +3,25 @@ import arxiv
 import requests
 from dotenv import load_dotenv
 from supabase import create_client
+from typing import Any
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 load_dotenv()
 
+
+def require_env(name: str) -> str:
+    value = os.getenv(name)
+    if not value:
+        raise RuntimeError(f"Missing required environment variable: {name}")
+    return value
+
 # --------------------------------
 # Supabase Configuration
 # --------------------------------
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_URL = require_env("SUPABASE_URL")
+SUPABASE_KEY = require_env("SUPABASE_KEY")
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -106,8 +114,11 @@ def embed_chunks(chunks, batch_size=32):
 # Ingestion Pipeline
 # --------------------------------
 
-def ingest_arxiv_papers(search_query: str, max_results: int = 1) -> list:
+def ingest_arxiv_papers(search_query: str, max_results: int = 5, max_papers_to_ingest: int = 2) -> list:
     """Ingest arxiv papers into Supabase. Returns list of paper source strings."""
+
+    def clean_text(value: str) -> str:
+        return value.replace("\x00", " ").replace("\u0000", " ")
 
     try:
         import fitz
@@ -120,17 +131,49 @@ def ingest_arxiv_papers(search_query: str, max_results: int = 1) -> list:
 
     client = arxiv.Client()
 
+    query_terms = {
+        term.lower()
+        for term in search_query.split()
+        if len(term) > 2
+    }
+
+    def score_paper(paper) -> int:
+        title = f"{paper.title} {paper.summary}".lower()
+        score = 0
+
+        for term in query_terms:
+            if term in title:
+                score += 1
+
+        # Give extra weight to exact title matches for the most specific terms.
+        for term in query_terms:
+            if term in paper.title.lower():
+                score += 2
+
+        return score
+
     search = arxiv.Search(
         query=search_query,
         max_results=max_results,
         sort_by=arxiv.SortCriterion.Relevance
     )
 
-    results = list(client.results(search))
+    results = sorted(list(client.results(search)), key=score_paper, reverse=True)
 
     if not results:
         print("No papers found.")
         return []
+
+    print("[ARXIV RANKING] Top candidates:")
+    for index, paper in enumerate(results[:5], start=1):
+        print(f"  {index}. score={score_paper(paper)} | {paper.title} ({paper.published.year})")
+
+    if results and score_paper(results[0]) == 0:
+        print("[ARXIV WARNING] No strong lexical match found in the top results; using ArXiv relevance order.")
+
+    selected_results = results[:max_papers_to_ingest]
+    if len(results) > len(selected_results):
+        print(f"[ARXIV LIMIT] Ingesting top {len(selected_results)} papers out of {len(results)} ranked candidates.")
 
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
@@ -142,7 +185,7 @@ def ingest_arxiv_papers(search_query: str, max_results: int = 1) -> list:
 
     paper_sources = []
 
-    for paper in results:
+    for paper in selected_results:
 
         source_label = f"{paper.title} ({paper.published.year})"
 
@@ -175,15 +218,18 @@ def ingest_arxiv_papers(search_query: str, max_results: int = 1) -> list:
         full_text = ""
 
         for page in doc:
-            full_text += page.get_text()
+            page_get_text: Any = getattr(page, "get_text", None)
+            if callable(page_get_text):
+                full_text += str(page_get_text())
 
         doc.close()
 
-        full_text = full_text.replace("\n", " ").strip()
+        full_text = clean_text(full_text).replace("\n", " ").strip()
 
         print("Splitting into chunks...")
 
-        chunks = text_splitter.split_text(full_text)
+        chunks = [clean_text(chunk) for chunk in text_splitter.split_text(full_text)]
+        chunks = [chunk.strip() for chunk in chunks if chunk.strip()]
 
         print(f"{len(chunks)} chunks created")
 
@@ -202,10 +248,13 @@ def ingest_arxiv_papers(search_query: str, max_results: int = 1) -> list:
         rows = []
 
         for text, metadata, embedding in zip(chunks, metadatas, embeddings):
+            clean_metadata = {}
+            for key, value in metadata.items():
+                clean_metadata[key] = clean_text(str(value))
 
             rows.append({
-                "content": text,
-                "metadata": metadata,
+                "content": clean_text(text),
+                "metadata": clean_metadata,
                 "embedding": embedding
             })
 

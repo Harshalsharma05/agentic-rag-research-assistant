@@ -58,6 +58,18 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Rotating sample prompts to suggest example questions to new users
+  const samplePrompts: string[] = [
+    "What are recent ArXiv papers on retrieval-augmented generation?",
+    "Summarize the latest findings about Llama 3 for reasoning tasks.",
+    "How does pgvector compare to other vector DBs for research use-cases?",
+    "Show me papers about efficient embedding techniques in 2024.",
+    "Explain how agentic RAG can autonomously expand its knowledge base.",
+  ];
+  const [promptIndex, setPromptIndex] = useState(0);
+  const [cycling, setCycling] = useState(true);
 
   // Generate a random session ID on load
   const [sessionId, setSessionId] = useState(() =>
@@ -68,6 +80,20 @@ export default function Home() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Rotate sample prompts when the input is empty and chat is fresh
+  useEffect(() => {
+    if (!cycling) return;
+    if (query || messages.length > 0 || loading) {
+      return;
+    }
+
+    const iv = setInterval(() => {
+      setPromptIndex((p) => (p + 1) % samplePrompts.length);
+    }, 3500);
+
+    return () => clearInterval(iv);
+  }, [query, messages.length, loading, cycling]);
 
   // Cycle through loading messages to show progress
   useEffect(() => {
@@ -203,9 +229,25 @@ export default function Home() {
         {/* Chat Display Area */}
         <div className="flex-1 bg-white border rounded-xl p-4 shadow-sm overflow-y-auto flex flex-col gap-4">
           {messages.length === 0 ? (
-            <div className="text-gray-400 text-center my-auto flex flex-col items-center justify-center h-full">
-              <span className="text-4xl mb-2">🤖</span>
-              Ask your first research question...
+            <div className="text-gray-600 text-center my-auto flex flex-col items-center justify-center h-full gap-3 px-6">
+              <span className="text-4xl">🤖</span>
+              {/* <h2 className="text-xl font-semibold">AI Research Copilot</h2> */}
+              <p className="max-w-2xl text-sm text-gray-500">
+                An agentic RAG research assistant that retrieves relevant
+                knowledge from a vector database and — when needed — performs
+                live research (ArXiv ingestion) to expand its knowledge base.
+              </p>
+              <p className="max-w-2xl text-sm text-gray-500">
+                Powered by Llama-3 inference, Supabase pgvector for persistence,
+                and Jina embeddings for fast semantic search — ask a research
+                question to get started or try one of the sample prompts below.
+              </p>
+              <div className="mt-2 text-sm text-gray-400 italic">
+                Try:{" "}
+                <span key={promptIndex} className="fade-up">
+                  {samplePrompts[promptIndex]}
+                </span>
+              </div>
             </div>
           ) : (
             messages.map((msg, index) => (
@@ -268,18 +310,44 @@ export default function Home() {
           </div>
         ) : (
           <form onSubmit={handleAsk} className="flex gap-2">
-            <input
-              type="text"
-              className="flex-1 p-4 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder={
-                messages.length === 0
-                  ? "Ask a research question..."
-                  : "Ask a follow-up question..."
-              }
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              disabled={loading}
-            />
+            <div className="relative flex-1">
+              <input
+                ref={inputRef}
+                type="text"
+                className="w-full p-4 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder={
+                  messages.length === 0 ? "" : "Ask a follow-up question..."
+                }
+                value={query}
+                onChange={(e) => {
+                  setCycling(false);
+                  setQuery(e.target.value);
+                }}
+                onFocus={() => {
+                  if (cycling && !query && messages.length === 0) {
+                    setQuery(samplePrompts[promptIndex]);
+                    setCycling(false);
+                  }
+                }}
+                disabled={loading}
+              />
+
+              {/* Overlayed animated sample prompt inside the input when empty */}
+              {cycling && !query && messages.length === 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery(samplePrompts[promptIndex]);
+                    setCycling(false);
+                    // focus the input after setting value
+                    setTimeout(() => inputRef.current?.focus(), 0);
+                  }}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400 italic fade-up text-left"
+                >
+                  {samplePrompts[promptIndex]}
+                </button>
+              )}
+            </div>
             <button
               type="submit"
               disabled={loading || !query}
