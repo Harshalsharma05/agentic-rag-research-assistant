@@ -198,7 +198,7 @@ def retrieve_documents(query: str):
         "match_documents",
         {
             "query_embedding": query_embedding,
-            "match_count": 3
+            "match_count": 5
         }
     ).execute()
 
@@ -221,7 +221,15 @@ def retrieve_documents(query: str):
                 m = {}
         metadatas.append(m if isinstance(m, dict) else {})
 
-    print(f"[RETRIEVAL] {len(documents)} docs, sources: {[m.get('source', 'Unknown') for m in metadatas]}")
+    sources_with_scores = [
+        f"{metadata.get('source', 'Unknown')} ({row.get('similarity', 0):.4f})"
+        for metadata, row in zip(metadatas, response_rows)
+        if isinstance(row, dict)
+    ]
+
+    print(
+        f"[RETRIEVAL] {len(documents)} docs, sources: {sources_with_scores}"
+    )
 
     return documents, metadatas
 

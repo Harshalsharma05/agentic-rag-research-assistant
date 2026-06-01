@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
 
 // Define the structure of a chat message
@@ -208,7 +209,9 @@ export default function Home() {
       <div className="w-full max-w-4xl flex flex-col gap-4 h-[90vh]">
         {/* Header & Badges */}
         <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border">
-          <h1 className="text-2xl font-bold">AI Research Copilot</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight text-[#332f7b]">
+            Syntropy: Agentic Research Assistant
+          </h1>
           <div className="flex items-center gap-4">
             {userMessageCount > 0 && (
               <span
@@ -230,8 +233,15 @@ export default function Home() {
         <div className="flex-1 bg-white border rounded-xl p-4 shadow-sm overflow-y-auto flex flex-col gap-4">
           {messages.length === 0 ? (
             <div className="text-gray-600 text-center my-auto flex flex-col items-center justify-center h-full gap-3 px-6">
-              <span className="text-4xl">🤖</span>
-              {/* <h2 className="text-xl font-semibold">AI Research Copilot</h2> */}
+              <Image
+                src="/syntropy-logo.png"
+                alt="Syntropy logo"
+                width={64}
+                height={64}
+                priority
+                className="h-16 w-16 object-contain"
+              />
+              {/* <h2 className="text-xl font-semibold">Syntropy</h2> */}
               <p className="max-w-2xl text-sm text-gray-500">
                 An agentic RAG research assistant that retrieves relevant
                 knowledge from a vector database and — when needed — performs

@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
-app = FastAPI(title="AI Research Copilot API")
+app = FastAPI(title="Syntropy API")
 
 _session_history = defaultdict(lambda: deque(maxlen=20))
 _session_history_lock = Lock()
@@ -41,7 +41,7 @@ def get_agent(): # this function will import the agent_app from agent.py on firs
 
 @app.get("/")
 def read_root():
-    return {"message": "AI Research Copilot Backend is running!", "status": "healthy"}
+    return {"message": "Syntropy Backend is running!", "status": "healthy"}
 
 @app.get("/health")
 def health_check():

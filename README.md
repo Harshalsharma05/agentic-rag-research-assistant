@@ -1,4 +1,9 @@
-# AI Research Copilot — Agentic RAG Research Assistant
+<div align="center">
+	<img src="frontend/public/syntropy-logo.png" alt="Syntropy logo" width="200" />
+
+  <h1>Syntropy — Agentic RAG Research Assistant</h1>
+
+</div>
 
 [![Live Demo](https://img.shields.io/badge/Demo-Live-success?style=for-the-badge)](https://agentic-rag-research-assistant-lb5yixibp.vercel.app/)
 [![Backend API](https://img.shields.io/badge/API-Deployed-blue?style=for-the-badge)](https://agentic-rag-backend-jy8a.onrender.com/)
@@ -11,7 +16,7 @@ Built using **LangGraph agent workflows**, **Supabase pgvector**, **Groq Llama-3
 
 # Project Overview
 
-AI Research Copilot is a **production-grade Agentic Retrieval-Augmented Generation (RAG) system**.
+Syntropy is a **production-grade Agentic Retrieval-Augmented Generation (RAG) system**.
 
 Unlike traditional RAG pipelines that only query a static vector database, this system **autonomously decides when it needs to expand its knowledge** by downloading new research papers from ArXiv and adding them to its knowledge base.
 

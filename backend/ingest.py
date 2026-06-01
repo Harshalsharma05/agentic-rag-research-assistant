@@ -9,25 +9,18 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 load_dotenv()
 
-
+# Environment and Configuration
 def require_env(name: str) -> str:
     value = os.getenv(name)
     if not value:
         raise RuntimeError(f"Missing required environment variable: {name}")
     return value
 
-# --------------------------------
-# Supabase Configuration
-# --------------------------------
-
 SUPABASE_URL = require_env("SUPABASE_URL")
 SUPABASE_KEY = require_env("SUPABASE_KEY")
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# --------------------------------
-# Jina Embedding API
-# --------------------------------
 
 JINA_API_KEY = os.getenv("JINA_API_KEY")
 JINA_EMBEDDING_MODEL = os.getenv("JINA_EMBEDDING_MODEL", "jina-embeddings-v3")
@@ -110,9 +103,7 @@ def embed_chunks(chunks, batch_size=32):
     return all_embeddings
 
 
-# --------------------------------
 # Ingestion Pipeline
-# --------------------------------
 
 def ingest_arxiv_papers(search_query: str, max_results: int = 5, max_papers_to_ingest: int = 2) -> list:
     """Ingest arxiv papers into Supabase. Returns list of paper source strings."""
@@ -267,10 +258,7 @@ def ingest_arxiv_papers(search_query: str, max_results: int = 5, max_papers_to_i
     return paper_sources
 
 
-# --------------------------------
 # Test ingestion
-# --------------------------------
-
 if __name__ == "__main__":
 
     ingest_arxiv_papers(
