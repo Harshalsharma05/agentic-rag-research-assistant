@@ -155,7 +155,7 @@ Before ingestion, existing papers are checked so duplicates are not re-added to 
 7️⃣ Split text into semantic chunks  
 8️⃣ Generate embeddings using Jina API  
 9️⃣ Store vectors in Supabase pgvector  
-10️⃣ Retrieve relevant chunks for answer generation
+1️⃣0️⃣ Retrieve relevant chunks for answer generation
 
 ---
 
@@ -274,6 +274,7 @@ JINA_API_KEY=
 SUPABASE_URL=
 SUPABASE_KEY=
 REDIS_URL=
+SEMANTIC_SCHOLAR_API_KEY=
 
 ```
 
