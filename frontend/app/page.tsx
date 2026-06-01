@@ -204,12 +204,21 @@ export default function Home() {
     setSessionId(Math.random().toString(36).substring(2, 15));
   };
 
+  const socialLinkClassName =
+    "inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900";
+
   return (
     <main className="flex min-h-screen flex-col items-center p-4 md:p-10 bg-gray-50 text-gray-900">
-      <div className="w-full max-w-4xl flex flex-col gap-4 h-[90vh]">
+      <div className="w-full max-w-6xl mx-auto flex flex-col gap-4 h-[90vh]">
         {/* Header & Badges */}
         <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border">
-          <h1 className="text-2xl font-extrabold tracking-tight text-[#332f7b]">
+          <h1
+            style={{
+              fontFamily: '"Times New Roman", Times, serif',
+              fontWeight: 400,
+            }}
+            className="text-3xl tracking-tight text-[#332f7b]"
+          >
             Syntropy: Agentic Research Assistant
           </h1>
           <div className="flex items-center gap-4">
@@ -319,7 +328,10 @@ export default function Home() {
             </button>
           </div>
         ) : (
-          <form onSubmit={handleAsk} className="flex gap-2">
+          <form
+            onSubmit={handleAsk}
+            className="flex flex-col md:flex-row gap-2"
+          >
             <div className="relative flex-1">
               <input
                 ref={inputRef}
@@ -361,12 +373,56 @@ export default function Home() {
             <button
               type="submit"
               disabled={loading || !query}
-              className="bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="md:w-auto w-full bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
               Send
             </button>
           </form>
         )}
+
+        <footer className="mt-1 flex flex-col items-center gap-3 border-t border-gray-200 pt-4 text-center text-sm text-gray-500 md:flex-row md:justify-between md:text-left">
+          <div className="flex flex-col items-center gap-1 md:items-start">
+            <span className="font-semibold tracking-wide text-[#332f7b]">
+              Syntropy
+            </span>
+            <span>Made by Harshal Sharma</span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <a
+              href="https://github.com/Harshalsharma05"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="GitHub profile"
+              className={socialLinkClassName}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+                className="h-4 w-4"
+              >
+                <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.48 0-.237-.009-.868-.014-1.703-2.782.604-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.907-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.091-.647.35-1.086.636-1.336-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.689-.103-.254-.446-1.279.098-2.664 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.026 2.747-1.026.546 1.385.203 2.41.1 2.664.64.701 1.028 1.596 1.028 2.689 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .265.18.577.688.478A10.019 10.019 0 0 0 22 12.017C22 6.484 17.523 2 12 2Z" />
+              </svg>
+            </a>
+            <a
+              href="https://www.linkedin.com/in/harshal-sharma-98851b2ab/"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="LinkedIn profile"
+              className={socialLinkClassName}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+                className="h-4 w-4"
+              >
+                <path d="M20.447 20.452h-3.554v-5.569c0-1.327-.024-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.94v5.666H9.352V9h3.414v1.561h.049c.476-.9 1.637-1.852 3.368-1.852 3.601 0 4.266 2.368 4.266 5.448v6.295ZM5.337 7.433a2.064 2.064 0 1 1 0-4.128 2.064 2.064 0 0 1 0 4.128ZM7.115 20.452H3.558V9h3.557v11.452Z" />
+              </svg>
+            </a>
+          </div>
+        </footer>
       </div>
     </main>
   );
