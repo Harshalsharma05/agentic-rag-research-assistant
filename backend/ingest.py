@@ -27,6 +27,8 @@ JINA_EMBEDDING_MODEL = os.getenv("JINA_EMBEDDING_MODEL", "jina-embeddings-v3")
 JINA_PASSAGE_TASK = os.getenv("JINA_PASSAGE_TASK", "retrieval.passage")
 JINA_EMBEDDING_DIMENSIONS = int(os.getenv("JINA_EMBEDDING_DIMENSIONS", "1024"))
 
+SEMANTIC_SCHOLAR_API_KEY = require_env("SEMANTIC_SCHOLAR_API_KEY")
+
 
 def get_embedding(text: str):
 
@@ -105,6 +107,93 @@ def embed_chunks(chunks, batch_size=32):
 
 # Ingestion Pipeline
 
+def search_semantic_scholar(query: str, limit: int = 10):
+
+    url = "https://api.semanticscholar.org/graph/v1/paper/search"
+
+    response = requests.get(
+        url,
+        headers={
+            "x-api-key": SEMANTIC_SCHOLAR_API_KEY
+        },
+        params={
+            "query": query,
+            "limit": limit,
+            "fields": "title,year,citationCount,externalIds,url,openAccessPdf"
+        },
+        timeout=30
+    )
+
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"Semantic Scholar API error {response.status_code}: {response.text}"
+        )
+
+    return response.json().get("data", [])
+
+def get_papers_from_semantic_scholar(
+    search_query: str,
+    limit: int = 10
+):
+
+    results = search_semantic_scholar(
+        search_query,
+        limit=limit
+    )
+
+    if not results:
+        return []
+
+    print("\n[SEMANTIC SCHOLAR RANKING]")
+
+    papers = []
+    seen_titles = set()
+
+    for index, result in enumerate(results, start=1):
+
+        title = result.get("title", "")
+        year = result.get("year")
+        citations = result.get("citationCount", 0)
+
+        arxiv_id = (
+            result.get("externalIds", {})
+            .get("ArXiv")
+        )
+
+        pdf_url = None
+
+        if arxiv_id:
+            pdf_url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
+
+        elif result.get("openAccessPdf"):
+            pdf_url = result["openAccessPdf"].get("url")
+
+        print(
+            f"{index}. citations={citations} | "
+            f"{title} ({year}) | "
+            f"pdf={pdf_url}"
+        )
+
+        if not pdf_url:
+            continue
+        
+        normalized_title = title.lower().strip()
+
+        if normalized_title in seen_titles:
+            continue
+
+        seen_titles.add(normalized_title)
+
+        papers.append({
+            "title": title,
+            "year": year,
+            "pdf_url": pdf_url,
+            "arxiv_id": arxiv_id
+        })
+
+    return papers
+
+
 def ingest_arxiv_papers(search_query: str, max_results: int = 5, max_papers_to_ingest: int = 2) -> list:
     """Ingest arxiv papers into Supabase. Returns list of paper source strings."""
 
@@ -118,51 +207,23 @@ def ingest_arxiv_papers(search_query: str, max_results: int = 5, max_papers_to_i
             "PyMuPDF import failed during paper ingestion."
         ) from e
 
-    print(f"Searching ArXiv for '{search_query}'")
-
-    client = arxiv.Client()
-
-    query_terms = {
-        term.lower()
-        for term in search_query.split()
-        if len(term) > 2
-    }
-
-    def score_paper(paper) -> int:
-        title = f"{paper.title} {paper.summary}".lower()
-        score = 0
-
-        for term in query_terms:
-            if term in title:
-                score += 1
-
-        # Give extra weight to exact title matches for the most specific terms.
-        for term in query_terms:
-            if term in paper.title.lower():
-                score += 2
-
-        return score
-
-    search = arxiv.Search(
-        query=search_query,
-        max_results=max_results,
-        sort_by=arxiv.SortCriterion.Relevance
+    print(
+        f"Searching Semantic Scholar for "
+        f"'{search_query}'"
     )
 
-    results = sorted(list(client.results(search)), key=score_paper, reverse=True)
+    results = get_papers_from_semantic_scholar(
+        search_query,
+        limit=max_results
+    )
 
     if not results:
         print("No papers found.")
         return []
-
-    print("[ARXIV RANKING] Top candidates:")
-    for index, paper in enumerate(results[:5], start=1):
-        print(f"  {index}. score={score_paper(paper)} | {paper.title} ({paper.published.year})")
-
-    if results and score_paper(results[0]) == 0:
-        print("[ARXIV WARNING] No strong lexical match found in the top results; using ArXiv relevance order.")
+    
 
     selected_results = results[:max_papers_to_ingest]
+    
     if len(results) > len(selected_results):
         print(f"[ARXIV LIMIT] Ingesting top {len(selected_results)} papers out of {len(results)} ranked candidates.")
 
@@ -178,7 +239,7 @@ def ingest_arxiv_papers(search_query: str, max_results: int = 5, max_papers_to_i
 
     for paper in selected_results:
 
-        source_label = f"{paper.title} ({paper.published.year})"
+        source_label = f"{paper['title']} ({paper['year']})"
 
         # Skip if paper already exists in Supabase (prevents duplicate flooding)
         try:
@@ -188,19 +249,33 @@ def ingest_arxiv_papers(search_query: str, max_results: int = 5, max_papers_to_i
                 .limit(1) \
                 .execute()
             if existing.data:
-                print(f"[SKIP] Already in knowledge base: {paper.title}")
+                print(f"[SKIP] Already in knowledge base: {paper['title']}")
                 paper_sources.append(source_label)
                 continue
         except Exception as e:
             print(f"[DEDUP WARNING] Could not check duplicates: {e}")
 
-        print(f"\nProcessing: {paper.title}")
+        print(f"\nProcessing: {paper['title']}")
         paper_sources.append(source_label)
 
-        pdf_path = f"downloads/{paper.get_short_id()}.pdf"
+        paper_id = (
+            paper.get("arxiv_id")
+            or paper["title"].replace(" ", "_")
+        )
+
+        pdf_path = f"downloads/{paper_id}.pdf"
 
         print("Downloading PDF...")
-        paper.download_pdf(filename=pdf_path)
+
+        pdf_response = requests.get(
+            paper["pdf_url"],
+            timeout=60
+        )
+
+        pdf_response.raise_for_status()
+
+        with open(pdf_path, "wb") as f:
+            f.write(pdf_response.content)
 
         print("Extracting text...")
 

@@ -8,7 +8,7 @@
 [![Live Demo](https://img.shields.io/badge/Demo-Live-success?style=for-the-badge)](https://agentic-rag-research-assistant-lb5yixibp.vercel.app/)
 [![Backend API](https://img.shields.io/badge/API-Deployed-blue?style=for-the-badge)](https://agentic-rag-backend-jy8a.onrender.com/)
 
-> An autonomous AI research assistant that dynamically retrieves knowledge from a vector database or performs real-time research by downloading and processing ArXiv papers.
+> An autonomous AI research assistant that dynamically retrieves knowledge from a vector database or performs real-time academic research by discovering papers with Semantic Scholar and processing open-access PDFs.
 
 Built using **LangGraph agent workflows**, **Supabase pgvector**, **Groq Llama-3.1**, and **Jina embeddings**.
 
@@ -18,7 +18,7 @@ Built using **LangGraph agent workflows**, **Supabase pgvector**, **Groq Llama-3
 
 Syntropy is a **production-grade Agentic Retrieval-Augmented Generation (RAG) system**.
 
-Unlike traditional RAG pipelines that only query a static vector database, this system **autonomously decides when it needs to expand its knowledge** by downloading new research papers from ArXiv and adding them to its knowledge base.
+Unlike traditional RAG pipelines that only query a static vector database, this system **autonomously decides when it needs to expand its knowledge** by discovering new research papers through Semantic Scholar and adding them to its knowledge base.
 
 This allows the assistant to **continuously grow its research knowledge during conversations.**
 
@@ -27,11 +27,15 @@ This allows the assistant to **continuously grow its research knowledge during c
 # Core Features
 
 ✅ **Agentic AI Workflow** powered by LangGraph  
-✅ **Dynamic Knowledge Expansion** through ArXiv ingestion  
+✅ **Semantic Scholar powered paper discovery**  
+✅ **Dynamic academic paper ingestion** through open-access PDFs  
 ✅ **Persistent Vector Database** using Supabase pgvector  
 ✅ **Fast LLM Inference** with Groq Llama-3.1  
 ✅ **Batch Embedding Pipeline** using Jina AI  
 ✅ **Conversational Memory** using Redis  
+✅ **Context-aware follow-up question retrieval**  
+✅ **Knowledge-base deduplication**  
+✅ **Retrieval-aware research triggering**  
 ✅ **Real-time Research Retrieval**  
 ✅ **Production Deployment** on Render + Vercel
 
@@ -47,17 +51,18 @@ This allows the assistant to **continuously grow its research knowledge during c
 
 ## Backend
 
-| Technology        | Purpose                           |
-| ----------------- | --------------------------------- |
-| FastAPI           | High-performance Python API       |
-| LangGraph         | Agent workflow orchestration      |
-| LangChain         | LLM abstraction + prompt handling |
-| Supabase pgvector | Persistent vector database        |
-| Groq Cloud        | Llama-3.1 inference               |
-| Jina AI           | High-speed embeddings API         |
-| PyMuPDF           | PDF text extraction               |
-| Redis             | Conversation memory persistence   |
-| ArXiv API         | Research paper retrieval          |
+| Technology             | Purpose                              |
+| ---------------------- | ------------------------------------ |
+| FastAPI                | High-performance Python API          |
+| LangGraph              | Agent workflow orchestration         |
+| LangChain              | LLM abstraction + prompt handling    |
+| Supabase pgvector      | Persistent vector database           |
+| Groq Cloud             | Llama-3.1 inference                  |
+| Jina AI                | High-speed embeddings API            |
+| PyMuPDF                | PDF text extraction                  |
+| Redis                  | Conversation memory persistence      |
+| Semantic Scholar API   | Academic paper discovery and ranking |
+| ArXiv/Open Access PDFs | Paper download source                |
 
 ---
 
@@ -131,7 +136,7 @@ decision
 
 ```
 
-If the context retrieved from the vector database is insufficient, the agent automatically triggers the research pipeline.
+If the retrieved context is sufficient, the agent answers directly. If not, it automatically triggers the research pipeline.
 
 ---
 
@@ -139,13 +144,18 @@ If the context retrieved from the vector database is insufficient, the agent aut
 
 When the system detects missing knowledge:
 
-1️⃣ Search ArXiv  
-2️⃣ Download PDF  
-3️⃣ Extract text using PyMuPDF  
-4️⃣ Split text into semantic chunks  
-5️⃣ Generate embeddings using Jina API  
-6️⃣ Store vectors in Supabase pgvector  
-7️⃣ Retrieve relevant chunks for answer generation
+Before ingestion, existing papers are checked so duplicates are not re-added to Supabase.
+
+1️⃣ User query  
+2️⃣ LLM-generated research query  
+3️⃣ Semantic Scholar search  
+4️⃣ Paper metadata retrieval  
+5️⃣ Direct PDF download from ArXiv or open-access URLs  
+6️⃣ Extract text using PyMuPDF  
+7️⃣ Split text into semantic chunks  
+8️⃣ Generate embeddings using Jina API  
+9️⃣ Store vectors in Supabase pgvector  
+10️⃣ Retrieve relevant chunks for answer generation
 
 ---
 
@@ -174,6 +184,8 @@ Benefits:
 - significantly faster ingestion
 - reduced API calls
 - lower embedding latency
+
+The current workflow also reduces external research calls by skipping ingestion when retrieval already returns sufficient relevant context.
 
 ---
 
@@ -205,6 +217,8 @@ This enables:
 • follow-up questions  
 • scalable memory for multiple users
 
+Follow-up questions are rewritten with prior conversation context before retrieval so short prompts like "explain more" stay anchored to the active topic.
+
 ---
 
 # Performance Metrics
@@ -215,6 +229,10 @@ This enables:
 | Vector search   | ~50-100ms  |
 | Paper ingestion | ~3-8s      |
 | Cold start      | ~2s        |
+
+Recent workflow improvements include fewer external research calls, faster paper acquisition, removal of ArXiv API rate-limit bottlenecks, and better retrieval relevance from higher-quality paper discovery.
+
+Retrieval results also log source names and similarity scores, which makes runtime debugging of search quality easier.
 
 ---
 
@@ -278,10 +296,13 @@ Planned upgrades:
 - Streaming responses (Server-Sent Events)
 - Multi-source research ingestion
 - Semantic caching layer
-- Knowledge deduplication
 - Paper summarization
 - Authentication (Clerk / Auth0)
 - Query analytics dashboard
+- Source-diverse retrieval
+- Retrieval reranking
+- Citation-aware answer generation
+- Hybrid search (vector + keyword)
 
 ---
 
