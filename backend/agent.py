@@ -272,6 +272,8 @@ def retrieve_documents(query: str):
             if isinstance(m, str):
                 try: m = json.loads(m)
                 except Exception: m = {}
+                m["rerank_score"] = row.get("rerank_score", 0.0)
+            
             metadatas.append(m if isinstance(m, dict) else {})
         else:
             metadatas.append({})
@@ -303,6 +305,20 @@ def retrieve_and_check(state: AgentState):
         print(f"[QUERY REWRITE] Retrieval query expanded to: {contextual_query}")
 
     documents, metadatas = retrieve_documents(contextual_query)
+    
+    # Jina Reranker v2 relevance scores range from 0.0 to 1.0. 
+    # Anything below 0.35 is complete noise. We scrub out low-confidence matches instantly.
+    filtered_pairs = [
+        (doc, meta) for doc, meta in zip(documents, metadatas)
+        if isinstance(meta, dict) and meta.get("rerank_score", 0.0) >= 0.35
+    ]
+    
+    if filtered_pairs:
+        documents = [pair[0] for pair in filtered_pairs]
+        metadatas = [pair[1] for pair in filtered_pairs]
+    else:
+        documents, metadatas = [], []
+        print("[RERANKER SHIELD] Wiped out all chunks. Confidence was below minimum threshold (0.35).")
 
     context_text = "\n\n".join(str(document) for document in documents)
 
