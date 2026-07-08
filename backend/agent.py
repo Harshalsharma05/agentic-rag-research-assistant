@@ -437,6 +437,18 @@ def do_research(state: AgentState): # This node is responsible for performing re
         print("[RESEARCH WARNING]", str(e))
 
     documents, metadatas = retrieve_documents(contextual_query)
+    
+    filtered_pairs = [
+        (doc, meta) for doc, meta in zip(documents, metadatas)
+        if isinstance(meta, dict) and meta.get("rerank_score", 0.0) >= 0.35
+    ]
+    
+    if filtered_pairs:
+        documents = [pair[0] for pair in filtered_pairs]
+        metadatas = [pair[1] for pair in filtered_pairs]
+    else:
+        documents, metadatas = [], []
+        print("[RERANKER SHIELD - RESEARCH] Wiped out low-confidence fallback context.")
 
     context_text = "\n\n".join(str(document) for document in documents)
 

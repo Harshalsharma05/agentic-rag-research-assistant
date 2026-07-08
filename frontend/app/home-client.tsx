@@ -122,17 +122,18 @@ export default function HomeClient({ lastUpdatedLabel }: HomeClientProps) {
 
   const handleAsk = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query || isLimitReached) return;
+
+    if (!query || isLimitReached || loading) return;
 
     const userQuery = query;
     setQuery("");
+    setLoading(true);
 
     const updatedMessages: Message[] = [
       ...messages,
       { role: "user", content: userQuery },
     ];
     setMessages(updatedMessages);
-    setLoading(true);
 
     try {
       const res = await fetch("/api/chat", {
@@ -350,10 +351,10 @@ export default function HomeClient({ lastUpdatedLabel }: HomeClientProps) {
             </div>
             <button
               type="submit"
-              disabled={loading || !query}
+              disabled={loading || isLimitReached || !query.trim()}
               className="md:w-auto w-full bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
-              Send
+              {loading ? "Searching..." : "Send"}
             </button>
           </form>
         )}

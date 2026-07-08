@@ -1,3 +1,5 @@
+import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -6,11 +8,27 @@ import os
 from collections import defaultdict, deque
 from threading import Lock
 import urllib.parse
+from agent import agent_app
 
 import redis as redis_lib
 from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
+
+logger = logging.getLogger("uvicorn")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ─── RUNS EXACTLY ONCE PER STARTUP UPON LIVE ROUTING ───
+    logger.info("[LIFESPAN] Activating centralized production handlers...")
+    
+    # Clean up third-party logging noise if needed
+    for name in ("httpcore", "httpx", "urllib3"):
+        logging.getLogger(name).setLevel(logging.WARNING)
+        
+    yield # Application serves requests here...
+    
+    logger.info("[LIFESPAN] Shutting down centralized handlers...")
 
 app = FastAPI(title="Syntropy API")
 
