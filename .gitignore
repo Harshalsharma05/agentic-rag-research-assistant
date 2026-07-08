@@ -12,6 +12,7 @@ ENV/
 
 RENDER_DEPLOYMENT.md
 VERCEL_DEPLOYMENT.md
+RETRIEVAL_OPTIMIZATION.md
 diagram.xml
 
 # Python cache and compiled files

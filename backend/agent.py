@@ -9,6 +9,7 @@ from pydantic.v1 import SecretStr
 from supabase import create_client
 from langgraph.graph import StateGraph, END
 from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 load_dotenv()
 
@@ -23,11 +24,19 @@ def require_env(name: str) -> str:
 # LLM (Groq)
 # -------------------------------
 
-llm = ChatGroq(
+# 1. Groq - Keep this for your extremely fast workflow routing checks
+routing_llm = ChatGroq(
     temperature=0,
     model="llama-3.1-8b-instant",
     api_key=SecretStr(require_env("GROQ_API_KEY")),
     stop_sequences=[]
+)
+
+# 2. Gemini - Use this for generation (massive context and structural reasoning)
+generation_llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash", 
+    api_key=SecretStr(require_env("GEMINI_API_KEY")),
+    temperature=0
 )
 
 # -------------------------------
@@ -47,6 +56,7 @@ JINA_API_KEY = os.getenv("JINA_API_KEY")
 JINA_EMBEDDING_MODEL = os.getenv("JINA_EMBEDDING_MODEL", "jina-embeddings-v3")
 JINA_QUERY_TASK = os.getenv("JINA_QUERY_TASK", "retrieval.query")
 JINA_EMBEDDING_DIMENSIONS = int(os.getenv("JINA_EMBEDDING_DIMENSIONS", "1024"))
+JINA_RERANKER_MODEL = os.getenv("JINA_RERANKER_MODEL", "jina-reranker-v2-base-multilingual")
 
 session = requests.Session()
 
@@ -112,13 +122,16 @@ def sanitize_search_query(raw_query: str) -> str: # ArXiv's search can be very s
 def build_research_queries(question: str, llm_query: str) -> List[str]:
     queries = []
 
-    question_query = sanitize_search_query(question)
-    if question_query:
-        queries.append(question_query)
+    # 1. Prioritize what the LLM generated (it's supposed to be the optimized phrase!)
+    # We just strip accidental quotes or whitespace it might have generated.
+    llm_clean = llm_query.strip().strip('"\'')
+    if llm_clean:
+        queries.append(llm_clean)
 
-    llm_sanitized = sanitize_search_query(llm_query)
-    if llm_sanitized and llm_sanitized not in queries:
-        queries.append(llm_sanitized)
+    # 2. Fallback to the user's raw question terms if the LLM output was empty
+    question_query = sanitize_search_query(question)
+    if question_query and question_query not in queries:
+        queries.append(question_query)
 
     return queries
 
@@ -194,9 +207,11 @@ def retrieve_documents(query: str):
 
     query_embedding = get_embedding(query)
 
+    # Call your new hybrid search function passing both text and vectors
     response = supabase.rpc(
-        "match_documents",
+        "hybrid_search",
         {
+            "query_text": query,
             "query_embedding": query_embedding,
             "match_count": 5
         }
@@ -207,29 +222,67 @@ def retrieve_documents(query: str):
     if not response_rows:
         return [], []
 
-    documents = [str(row["content"]) for row in response_rows if isinstance(row, dict) and "content" in row]
+    # Extract structural components from your candidate matches
+    raw_docs = [str(row["content"]) for row in response_rows if isinstance(row, dict) and "content" in row]
+    if not raw_docs:
+        return [], []
 
-    metadatas = []
-    for row in response_rows:
-        if not isinstance(row, dict):
-            continue
-        m = row.get("metadata", {})
-        if isinstance(m, str):
-            try:
-                m = json.loads(m)
-            except Exception:
-                m = {}
-        metadatas.append(m if isinstance(m, dict) else {})
+    print(f"[HYBRID SEARCH] Fetched {len(raw_docs)} candidate chunks. Sending to Jina Reranker...")
 
-    sources_with_scores = [
-        f"{metadata.get('source', 'Unknown')} ({row.get('similarity', 0):.4f})"
-        for metadata, row in zip(metadatas, response_rows)
-        if isinstance(row, dict)
-    ]
-
-    print(
-        f"[RETRIEVAL] {len(documents)} docs, sources: {sources_with_scores}"
+    # 1. POST to Jina's Cross-Encoder endpoint
+    rerank_response = session.post(
+        "https://api.jina.ai/v1/rerank",
+        headers={
+            "Authorization": f"Bearer {JINA_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": JINA_RERANKER_MODEL,
+            "query": query,
+            "documents": raw_docs,
+            "top_n": 4 # Dynamically drop the lowest scoring chunk to keep context window hyper-focused
+        },
+        timeout=30
     )
+
+    if rerank_response.status_code != 200:
+        print(f"[RERANKER WARNING] API failed with code {rerank_response.status_code}. Falling back to hybrid scores.")
+        sorted_rows = response_rows
+    else:
+        # 2. Re-order your documents based on the precise contextual relevance score
+        rerank_data = rerank_response.json().get("results", [])
+        sorted_rows = []
+        for item in rerank_data:
+            idx = item["index"]
+            raw_row = response_rows[idx]
+            
+            # Ensure it's treated strictly as a dictionary to appease Pylance
+            if isinstance(raw_row, dict):
+                row_dict = dict(raw_row)  # Create a mutable copy
+                row_dict["rerank_score"] = item["relevance_score"]
+                sorted_rows.append(row_dict)
+
+    # 3. Parse final structured arrays making sure Pylance is happy with the types
+    documents = [str(row["content"]) for row in sorted_rows if isinstance(row, dict) and "content" in row]
+    
+    metadatas = []
+    for row in sorted_rows:
+        if isinstance(row, dict):
+            m = row.get("metadata", {})
+            if isinstance(m, str):
+                try: m = json.loads(m)
+                except Exception: m = {}
+            metadatas.append(m if isinstance(m, dict) else {})
+        else:
+            metadatas.append({})
+
+    # Log your precision metrics to verify that the out-of-context blocks were pushed down
+    sources_with_scores = [
+        f"{meta.get('source', 'Unknown')} (Rerank Score: {row.get('rerank_score', 0):.4f})"
+        for meta, row in zip(metadatas, sorted_rows)
+        if isinstance(row, dict) # Ensure row is a dict before accessing keys
+    ]
+    print(f"[FINAL RETRIEVAL CONTEXT] {len(documents)} chunks selected. Sources: {sources_with_scores}")
 
     return documents, metadatas
 
@@ -266,43 +319,42 @@ def retrieve_and_check(state: AgentState):
 
     needs_research = False
 
-    if len(documents) < 3:
-
+    # If the DB returned nothing at all, immediately trigger research
+    if not documents:
+        needs_research = True
+        print("Knowledge Check: NO (No documents found)")
+    else:
+        # ALWAYS let Groq evaluate if the retrieved nearest-neighbors are actually relevant
         decision_prompt = f"""
-            You are a retrieval evaluator.
+            You are a strict RAG Retrieval Quality Evaluator.
+            Your job is to determine if the current Context contains enough specific facts to directly answer or meaningfully contribute to the User's Query.
 
-            Determine whether the retrieved context is relevant to the user's query.
+            Evaluation Rules:
+            1. Reply YES if the context contains direct answers, partial answers, or highly relevant technical context that allows a grounded response.
+            2. Reply NO if the context is completely empty, entirely unrelated to the core technical concepts, or if it is impossible to answer the query without making things up.
+            3. Do NOT trigger unnecessary research if the context already contains the specific formulas, definitions, or mechanisms requested.
 
-            Important:
-            - Reply YES if the retrieved context contains information related to answering the query, even if the answer may be incomplete.
-            - Reply NO only if the retrieved context is unrelated or clearly insufficient.
+            Strict Output Format:
+            Reply with exactly ONE word: either YES or NO. Do not include punctuation, reasoning, or extra characters.
 
             Conversation History:
             {history_str}
 
-            Query:
+            User Query:
             {contextual_query}
 
-            Context:
+            Retrieved Context:
             {context_text}
 
-            Reply ONLY YES or NO.
+            Decision (YES/NO):
         """
-        decision_message = llm.invoke(decision_prompt)
+        
+        decision_message = routing_llm.invoke(decision_prompt)
+        decision = str(getattr(decision_message, "content", "")).strip().upper()
 
-        decision = str(
-            getattr(decision_message, "content", "")
-        ).strip().upper()
-
-        needs_research = (
-            "NO" in decision
-            or not context_text.strip()
-        )
-
-    else:
-        decision = "YES"
-
-    print("Knowledge Check:", decision)
+        # If Groq says NO (the chunks are irrelevant), trigger research
+        needs_research = "NO" in decision
+        print("Knowledge Check:", decision)
 
     return {
         "query": state["query"],
@@ -330,23 +382,28 @@ def do_research(state: AgentState): # This node is responsible for performing re
         print(f"[QUERY REWRITE] Research query expanded to: {contextual_query}")
 
     search_prompt = f"""
-Generate a concise ArXiv search phrase using 2 to 6 terms.
-Return ONLY the search phrase.
-Do not add quotes.
-Do not add labels.
-Do not add explanation.
+        You are a highly precise academic router for Semantic Scholar.
+        Analyze the user's input and generate an optimized plain-text query.
 
-Example output:
-multimodal model comparison
+        Strict Rules:
+        1. If the user is asking about a specific, famous, or named paper (e.g., "Attention Is All You Need", "YOLOv8", "BERT"), output ONLY the exact, clean title of that paper. Do NOT add concepts, topics, or technical parameters onto it.
+        2. If the user is asking a general topical question (e.g., "how does multi-head attention work?"), output 2 to 4 dense, specialized keyword noun phrases.
+        3. Never include conversational verbs, formatting, labels, or stop words (e.g., "explain", "paper", "review", "concept").
+        4. Return ONLY the plain search string. No quotes, no preamble.
 
-Conversation History:
-{history_str}
+        Examples:
+        - Question: "Explain self-attention in Attention Is All You Need" -> Attention Is All You Need
+        - Question: "What is the architecture of the original Transformer paper?" -> Attention Is All You Need
+        - Question: "Show me recent optimizations for flash attention layers" -> flash attention optimization training
 
-Question:
-{contextual_query}
-"""
+        Conversation History:
+        {history_str}
 
-    raw_arxiv_message = llm.invoke(search_prompt)
+        Question:
+        {contextual_query}
+    """
+
+    raw_arxiv_message = routing_llm.invoke(search_prompt)
     raw_arxiv_query = str(getattr(raw_arxiv_message, "content", "")).strip()
     arxiv_queries = build_research_queries(contextual_query, raw_arxiv_query)
     research_query = arxiv_queries[0] if arxiv_queries else sanitize_search_query(contextual_query)
@@ -437,8 +494,9 @@ def generate_answer(state: AgentState):
         Answer using only the retrieved context. If needed, begin with: "I could not find enough information in the retrieved papers."
     """
 
-    response_message = llm.invoke(prompt)
-    response = str(getattr(response_message, "content", "")).strip()
+    response_message = generation_llm.invoke(prompt)
+    # response = str(getattr(response_message, "content", "")).strip()
+    response = str(response_message.content).strip()
 
     return {
         "query": state["query"],

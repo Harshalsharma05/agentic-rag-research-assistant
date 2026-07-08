@@ -8,202 +8,78 @@
 [![Live Demo](https://img.shields.io/badge/Demo-Live-success?style=for-the-badge)](https://agentic-rag-research-assistant-lb5yixibp.vercel.app/)
 [![Backend API](https://img.shields.io/badge/API-Deployed-blue?style=for-the-badge)](https://agentic-rag-backend-jy8a.onrender.com/)
 
-> An autonomous AI research assistant that dynamically retrieves knowledge from a vector database or performs real-time academic research by discovering papers with Semantic Scholar and processing open-access PDFs.
+> A retrieval augmented search assistant featuring dynamic data ingestion. It supplements a standard vector database by automatically scraping, chunking, and embedding missing academic research via Semantic Scholar during active conversations.
 
-Built using **LangGraph agent workflows**, **Supabase pgvector**, **Groq Llama-3.1**, and **Jina embeddings**.
+Built with LangGraph, Supabase pgvector, Groq, Gemini 2.5 Flash, and Jina AI.
 
 ---
 
 # Project Overview
 
-Syntropy is a **production-grade Agentic Retrieval-Augmented Generation (RAG) system**.
+Syntropy is a dynamic **Retrieval-Augmented Generation (RAG)** system designed to overcome the limitations of static vector databases. 
 
-Unlike traditional RAG pipelines that only query a static vector database, this system **autonomously decides when it needs to expand its knowledge** by discovering new research papers through Semantic Scholar and adding them to its knowledge base.
+Rather than relying on pre populated knowledge, the system programmatically evaluates context sufficiency. 
 
-This allows the assistant to **continuously grow its research knowledge during conversations.**
+If existing data is inadequate, it triggers an **automated ingestion pipeline** that queries the Semantic Scholar API to fetch, process, and index new academic papers in real time, allowing the database to scale organically based on user queries.
 
 ---
 
 # Core Features
 
-✅ **Agentic AI Workflow** powered by LangGraph  
-✅ **Semantic Scholar powered paper discovery**  
-✅ **Dynamic academic paper ingestion** through open-access PDFs  
-✅ **Persistent Vector Database** using Supabase pgvector  
-✅ **Fast LLM Inference** with Groq Llama-3.1  
-✅ **Batch Embedding Pipeline** using Jina AI  
-✅ **Conversational Memory** using Redis  
-✅ **Context-aware follow-up question retrieval**  
-✅ **Knowledge-base deduplication**  
-✅ **Retrieval-aware research triggering**  
-✅ **Real-time Research Retrieval**  
-✅ **Production Deployment** on Render + Vercel
+- **Multi-LLM Cognitive Routing:** Uses Groq (Llama-3.1-8b) for sub-second task classification and Gemini 2.5 Flash for complex document synthesis.
+
+- **Concurrency & State Management:** Uses database-enforced unique constraints and background polling to prevent race conditions during parallel processing.
+
+- **Advanced Retrieval Architecture:** Implements a Parent-Child hierarchical tree and Two-Stage Semantic Chunking to reduce context dilution.
+
+- **Hybrid Search & Cross-Encoder Reranking:** Combines PostgreSQL BM25 sparse search with dense vectors via Reciprocal Rank Fusion (RRF), refined by Jina Reranker.
 
 ---
 
-# System Architecture
+# System Architecture & Tech Stack
+Syntropy is built on a modular, multi-tier architecture prioritizing low-latency inference, dynamic data ingestion, and scalable vector retrieval. 
 
-![System Architecture](system_architecture.png)
+<div align="center">
+	<img src="system_architecture.png" alt="System Architecture" width="600" height="450"/>
+</div>
 
----
-
-# Tech Stack
-
-## Backend
-
-| Technology             | Purpose                              |
-| ---------------------- | ------------------------------------ |
-| FastAPI                | High-performance Python API          |
-| LangGraph              | Agent workflow orchestration         |
-| LangChain              | LLM abstraction + prompt handling    |
-| Supabase pgvector      | Persistent vector database           |
-| Groq Cloud             | Llama-3.1 inference                  |
-| Jina AI                | High-speed embeddings API            |
-| PyMuPDF                | PDF text extraction                  |
-| Redis                  | Conversation memory persistence      |
-| Semantic Scholar API   | Academic paper discovery and ranking |
-| ArXiv/Open Access PDFs | Paper download source                |
 
 ---
 
-## Frontend
-
-| Technology  | Purpose            |
-| ----------- | ------------------ |
-| Next.js     | React framework    |
-| TypeScript  | Type-safe frontend |
-| TailwindCSS | UI styling         |
-| Vercel      | Frontend hosting   |
-
----
-
-## DevOps
-
-| Tool     | Purpose                 |
-| -------- | ----------------------- |
-| Render   | Backend deployment      |
-| Vercel   | Frontend deployment     |
-| GitHub   | Version control         |
-| Supabase | Vector database hosting |
+| Architecture Layer | Technology | Engineering Purpose |
+| :--- | :--- | :--- |
+| **Cognition & Orchestration** | **LangGraph & LangChain** | State machine routing, tool calling, and workflow orchestration. |
+| | **Groq (Llama-3.1-8b)** | Sub-second task classification and fast-path agent routing. |
+| | **Google Gemini 2.5 Flash** | High-context synthesis and complex research generation. |
+| **Search & Vector Storage** | **Supabase pgvector** | Relational data mapping, persistent vectors, and PostgreSQL BM25 hybrid search. |
+| | **Jina AI** | High-speed batch embeddings and Cross-Encoder (v2) reranking. |
+| **Dynamic Ingestion** | **Semantic Scholar API** | Autonomous academic paper discovery and citation ranking. |
+| | **PyMuPDF** | Headless PDF parsing and raw text extraction for semantic chunking. |
+| **Core Infrastructure** | **FastAPI & Redis** | High-concurrency Python API and low-latency conversational memory. |
 
 ---
 
-# Deployment Architecture
+# Engineering Challenges & Architectural Solutions
 
-```
+## Highlight 1: Multi-LLM Routing for Latency Optimization
 
-User
-↓
-Vercel (Next.js Frontend)
-↓
-Render (FastAPI Backend)
-↓
-LangGraph Agent
-↓
-Supabase pgvector
-↓
-Jina Embedding API
-↓
-Groq Llama-3.1
+- **The Problem:** Single-model systems either sacrifice speed for reasoning capability or hallucinate on complex academic text.
+- **The Solution:** Implemented a dual-engine routing tier within LangGraph. Groq (Llama-3.1-8b) evaluates context sufficiency and routes logic in under 400ms, while Google Gemini 2.5 Flash acts as the synthesis engine for clear, citation-backed reporting.
 
-```
+## Highlight 2: Concurrency Control & Race Condition Mitigation
 
----
+- **The Problem:** Simultaneous queries for the same academic paper caused redundant PDF downloads, wasted embedding tokens, and database flooding.
+- **The Solution:** Architected a relational one-to-many database schema mapping a tracking table (`papers`) to chunks (`documents`). Added a PostgreSQL `UNIQUE` constraint on the `paper_id` combined with an atomic background polling loop to isolate thread states and safely manage duplicate requests.
 
-# Live Deployment
+## Highlight 3: Parent-Child Hierarchical Retrieval & Semantic Chunking
 
-Frontend  
-https://agentic-rag-research-assistant-lb5yixibp.vercel.app
+- **The Problem:** Standard vector chunks either starve the LLM of background context (too small) or dilute the signal-to-noise ratio (too large).
+- **The Solution:** Built a Two-Stage Semantic Chunking pipeline. The system creates distinct ~2,500-character "Parent" blocks, which are then split into semantic "Child" sentences for Jina vector embedding. A `DISTINCT ON` query join ensures the search targets the precise child vectors but returns the comprehensive parent context to the LLM.
 
-Backend API  
-https://agentic-rag-backend-jy8a.onrender.com
+## Highlight 4: Hybrid Search Engine with Reranking
 
----
-
-# Key Technical Highlights
-
-## 1️⃣ Agentic Decision Engine
-
-The system uses **LangGraph's state machine** to determine whether existing knowledge is sufficient or new research must be performed.
-
-```
-
-retrieve_and_check
-↓
-decision
-├─ generate_answer
-└─ do_research
-
-```
-
-If the retrieved context is sufficient, the agent answers directly. If not, it automatically triggers the research pipeline.
-
----
-
-# 2️⃣ Research Paper Ingestion Pipeline
-
-When the system detects missing knowledge:
-
-Before ingestion, existing papers are checked so duplicates are not re-added to Supabase.
-
-1️⃣ User query  
-2️⃣ LLM-generated research query  
-3️⃣ Semantic Scholar search  
-4️⃣ Paper metadata retrieval  
-5️⃣ Direct PDF download from ArXiv or open-access URLs  
-6️⃣ Extract text using PyMuPDF  
-7️⃣ Split text into semantic chunks  
-8️⃣ Generate embeddings using Jina API  
-9️⃣ Store vectors in Supabase pgvector  
-1️⃣0️⃣ Retrieve relevant chunks for answer generation
-
----
-
-# 3️⃣ Optimized Embedding Pipeline
-
-The system uses **batch embeddings** to dramatically reduce latency.
-
-Instead of:
-
-```
-
-100 chunks → 100 API calls
-
-```
-
-It performs:
-
-```
-
-100 chunks → ~3 batch calls
-
-```
-
-Benefits:
-
-- significantly faster ingestion
-- reduced API calls
-- lower embedding latency
-
-The current workflow also reduces external research calls by skipping ingestion when retrieval already returns sufficient relevant context.
-
----
-
-# 4️⃣ Persistent Vector Database
-
-Vectors are stored in **Supabase pgvector**, enabling:
-
-• persistent storage  
-• scalable vector search  
-• SQL-based similarity queries
-
-Example vector similarity function:
-
-```
-
-match_documents(query_embedding vector, match_count int)
-
-```
+- **The Problem:** Pure dense vector similarity often fails to capture strict technical acronyms or specific author names.
+- **The Solution:** Engineered a hybrid search function in Supabase merging native PostgreSQL Generalized Inverted Index (GIN) full-text search with vector similarity via Reciprocal Rank Fusion (RRF). Results are then validated through deep cross-attention using the Jina Cross-Encoder Reranker v2 API to strictly prune irrelevant context before generation.
 
 ---
 
@@ -221,21 +97,28 @@ Follow-up questions are rewritten with prior conversation context before retriev
 
 ---
 
-# Performance Metrics
+# System Performance & Latency
 
-| Metric          | Value      |
-| --------------- | ---------- |
-| LLM inference   | ~400-600ms |
-| Vector search   | ~50-100ms  |
-| Paper ingestion | ~3-8s      |
-| Cold start      | ~2s        |
+The architecture handles complex multi-stage pipelines, balancing fast retrieval for known queries with robust, asynchronous processing for novel research tasks. 
 
-Recent workflow improvements include fewer external research calls, faster paper acquisition, removal of ArXiv API rate-limit bottlenecks, and better retrieval relevance from higher-quality paper discovery.
+### End-to-End Query Scenarios
+* **Best-Case Scenario (Hot Path): ~7 – 10s**
+  Triggered when the vector database already holds sufficient context. This duration accounts for the Groq logic routing, Supabase hybrid search, Jina cross-encoder reranking, and the comprehensive Gemini 2.5 Flash token synthesis.
+* **Worst-Case Scenario (Cold Path): ~45 – 50s**
+  Triggered when the agent detects a knowledge gap and must conduct novel research. This extended latency accounts for Semantic Scholar API discovery, headless PDF streaming, two-stage semantic chunking, batch vector upserts, and final multi-document synthesis.
 
-Retrieval results also log source names and similarity scores, which makes runtime debugging of search quality easier.
+### Pipeline Execution Breakdown
 
----
+While end-to-end latency is heavily influenced by external network I/O and LLM token generation, the internal infrastructure is optimized to minimize bottlenecks:
 
+| Component Operation | Latency | Engineering Notes |
+| :--- | :--- | :--- |
+| **Vector + Keyword Retrieval** | ~15–40 ms | pgvector Cosine + Postgres FTS (GIN) via SQL RPC. |
+| **Cross-Encoder Reranking** | ~180–250 ms | Network I/O roundtrip to Jina Reranker v2 API. |
+| **LLM Synthesis (Gemini)** | ~4–8s | Accounts for the bulk of the Hot Path; heavily dependent on output token length. |
+| **Paper Registry Lock** | ~10–25 ms | Relational lookup blocking race conditions on the `papers` table. |
+| **Batch Embedding** | ~450 ms | Custom async batching, reducing O(N) calls to O(1) per 100 chunks. |
+| **PDF Stream & Chunking** | ~30–40s | Accounts for the bulk of the Cold Path; variable based on paper length and PyMuPDF processing. |
 # Repository Structure
 
 ```
@@ -301,9 +184,7 @@ Planned upgrades:
 - Authentication (Clerk / Auth0)
 - Query analytics dashboard
 - Source-diverse retrieval
-- Retrieval reranking
 - Citation-aware answer generation
-- Hybrid search (vector + keyword)
 
 ---
 
