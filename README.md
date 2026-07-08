@@ -79,7 +79,15 @@ Syntropy is built on a modular, multi-tier architecture prioritizing low-latency
 ## Highlight 4: Hybrid Search Engine with Reranking
 
 - **The Problem:** Pure dense vector similarity often fails to capture strict technical acronyms or specific author names.
-- **The Solution:** Engineered a hybrid search function in Supabase merging native PostgreSQL Generalized Inverted Index (GIN) full-text search with vector similarity via Reciprocal Rank Fusion (RRF). Results are then validated through deep cross-attention using the Jina Cross-Encoder Reranker v2 API to strictly prune irrelevant context before generation.
+- **The Solution:** Engineered a custom PostgreSQL Remote Procedure Call (RPC) function in Supabase that unifies native Generalized Inverted Index (GIN) full-text keyword search with dense vector similarity. The function blends results in database via Reciprocal Rank Fusion (RRF) before a final Jina Cross-Encoder Reranker pass that prunes irrelevant context prior to generation.
+
+```sql
+SELECT * FROM  hybrid_search(
+    query_text := 'attention mechanisms in transformers',
+    query_embedding := '[0.123, -0.456, ...]',
+    match_count := 10
+);
+```
 
 ---
 
