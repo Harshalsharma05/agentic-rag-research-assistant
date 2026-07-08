@@ -153,6 +153,7 @@ Agentic_RAG/
 ```
 
 GROQ_API_KEY=
+GEMINI_API_KEY=
 JINA_API_KEY=
 SUPABASE_URL=
 SUPABASE_KEY=
@@ -167,7 +168,7 @@ SEMANTIC_SCHOLAR_API_KEY=
 
 ```
 
-NEXT_PUBLIC_BACKEND_URL=
+NEXT_PUBLIC_BACKEND_URL=http://127.0.0.1:8000
 
 ```
 
@@ -178,12 +179,10 @@ NEXT_PUBLIC_BACKEND_URL=
 Planned upgrades:
 
 - Streaming responses (Server-Sent Events)
-- Multi-source research ingestion
+- Multi source research ingestion
 - Semantic caching layer
 - Paper summarization
-- Authentication (Clerk / Auth0)
-- Query analytics dashboard
-- Source-diverse retrieval
+- Source diverse retrieval
 - Citation-aware answer generation
 
 ---
