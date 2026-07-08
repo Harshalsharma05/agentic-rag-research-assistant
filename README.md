@@ -5,7 +5,7 @@
 
 </div>
 
-[![Live Demo](https://img.shields.io/badge/Demo-Live-success?style=for-the-badge)](https://agentic-rag-research-assistant-lb5yixibp.vercel.app/)
+[![Live Demo](https://img.shields.io/badge/Demo-Live-success?style=for-the-badge)](https://agentic-rag-research-assistant.vercel.app/)
 [![Backend API](https://img.shields.io/badge/API-Deployed-blue?style=for-the-badge)](https://agentic-rag-backend-jy8a.onrender.com/)
 
 > A retrieval augmented search assistant featuring dynamic data ingestion. It supplements a standard vector database by automatically scraping, chunking, and embedding missing academic research via Semantic Scholar during active conversations.
