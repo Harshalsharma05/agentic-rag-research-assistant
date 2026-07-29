@@ -8,7 +8,7 @@ import os
 from collections import defaultdict, deque
 from threading import Lock
 import urllib.parse
-from agent import agent_app
+from backend.core.agent import agent_app
 
 import redis as redis_lib
 from dotenv import load_dotenv
@@ -53,7 +53,7 @@ _agent_app = None
 def get_agent(): # this function will import the agent_app from agent.py on first call, and return the same instance on subsequent calls. This allows us to avoid the slow import of langchain and other heavy libraries until we actually need to process a request, improving startup time and resource usage for simple health checks or other non-agent endpoints.
     global _agent_app
     if _agent_app is None:
-        from agent import agent_app
+        from backend.core.agent import agent_app
         _agent_app = agent_app
     return _agent_app
 
